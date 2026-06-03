@@ -60,8 +60,8 @@ KHunter采用**五维度综合评分模型**，从多个角度全面评估股票
 - **一键启动** - 快速开始选股
 
 ### 环境要求
-- Python 3.8+
-- pip 或 conda
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) - 现代 Python 包管理器
 
 ### 安装步骤
 
@@ -70,13 +70,13 @@ KHunter采用**五维度综合评分模型**，从多个角度全面评估股票
 git clone https://github.com/ling-0729/KHunter.git
 cd KHunter
 
-# 2. 安装依赖
-pip install -r requirements.txt
+# 2. 安装依赖（uv 会自动创建虚拟环境）
+uv sync
 
 # 3. 启动Web界面
-python main.py web
+uv run main.py web
 ```
-第2，3步也可以直接在windows下双击根目录下start.bat文件自动处理
+Windows 用户也可以直接双击根目录下 `start.bat` 文件自动处理
 
 
 ## 🌐 Web界面功能
@@ -140,7 +140,8 @@ python main.py web
 
 ## 🛠️ 技术栈
 
-- **Python 3.8+** - 核心语言
+- **Python 3.12+** - 核心语言
+- **uv** - 现代 Python 包管理器
 - **akshare** - A股实时/历史数据获取
 - **pandas/numpy** - 数据处理与技术指标计算
 - **matplotlib** - K线图生成
