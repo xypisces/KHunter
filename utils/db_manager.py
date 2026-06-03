@@ -455,7 +455,7 @@ class DBManager:
     def begin_transaction(self):
         """
         开始事务
-        
+
         - 获取全局写入锁，保证同一时刻只有一个写入事务
         - 保存事务专用连接，确保事务内所有操作使用同一连接
         - 执行 BEGIN IMMEDIATE 立即获取写入锁，避免锁升级冲突
@@ -470,6 +470,13 @@ class DBManager:
                 # 获取连接并保存为事务专用连接
                 conn = self.connect()
                 self._tx_connection = conn
+
+                # 检查连接是否已经在隐式事务中（Python sqlite3 默认行为）
+                # 如果是，先提交以清理状态，避免 "cannot start a transaction within a transaction" 错误
+                if conn.in_transaction:
+                    logger.debug("检测到隐式事务，先提交以清理状态")
+                    conn.commit()
+
                 # BEGIN IMMEDIATE 立即获取写入锁，避免后续锁升级失败
                 conn.execute('BEGIN IMMEDIATE')
                 logger.debug("事务开始（已获取写入锁）")
