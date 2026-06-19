@@ -97,7 +97,7 @@ class KlineUpdater:
             
             # 第0步：检查数据源是否已准备好目标日期数据
             logger.info("第0步: 检查数据源数据就绪状态...")
-            if not self._is_data_source_ready(stock_codes, target_date):
+            if not self._is_data_source_ready(stock_codes, target_date, last_update_date):
                 logger.warning(f"数据源 (TickFlow) 尚未返回 {target_date} 的数据，跳过本次更新")
                 return {
                     'success': True,
@@ -209,16 +209,20 @@ class KlineUpdater:
                 'total_time': total_time
             }
     
-    def _is_data_source_ready(self, stock_codes: List[str], target_date: str) -> bool:
+    def _is_data_source_ready(self, stock_codes: List[str], target_date: str, last_update_date: Optional[str] = None) -> bool:
         """
         检查数据源 (TickFlow) 是否已准备好目标日期的数据
 
         取样少量股票，拉取 TickFlow 最新 K 线，
         检查返回数据中是否包含 target_date。
 
+        如果目标日期数据不存在，但数据源有比上次更新更新的数据，也视为就绪。
+        这样可以处理节假日等情况：目标日期是节假日，但数据源有最近交易日的数据。
+
         参数：
             stock_codes: 全部待更新股票代码列表
             target_date: 目标更新日期 (YYYY-MM-DD)
+            last_update_date: 上次更新日期 (YYYY-MM-DD)，用于判断是否有更新的数据
 
         返回：
             True 数据就绪，False 数据尚未可用
@@ -264,6 +268,35 @@ class KlineUpdater:
             if len(ready_codes) >= 2:
                 logger.info(f"数据源就绪检查: {ready_codes} 已有 {target_date} 数据，数据源就绪")
                 return True
+
+            # 目标日期数据不存在，检查数据源是否有目标日期或更新的数据
+            # 这样可以处理节假日等情况：目标日期是节假日，但数据源有最近交易日的数据
+            if all_dates:
+                max_available_date = max(all_dates)
+                # 标准化日期格式进行比较
+                max_date_normalized = max_available_date.replace('-', '')
+                target_date_normalized_str = target_date.replace('-', '')
+
+                # 数据源最新日期 >= 目标日期，说明有目标日期或更新的数据
+                if max_date_normalized >= target_date_normalized_str:
+                    logger.info(
+                        f"数据源就绪检查: 目标日期 {target_date} 数据不存在，"
+                        f"但数据源有更新的数据 {max_available_date}（>= 目标日期），"
+                        f"允许更新"
+                    )
+                    return True
+
+                # 数据源最新日期 < 目标日期，但比上次更新新，也允许更新
+                # 这样可以处理目标日期是未来日期的情况
+                if last_update_date:
+                    last_update_normalized = last_update_date.replace('-', '')
+                    if max_date_normalized > last_update_normalized:
+                        logger.info(
+                            f"数据源就绪检查: 目标日期 {target_date} 数据不存在，"
+                            f"但数据源有比上次更新更新的数据 {max_available_date}（上次更新: {last_update_date}），"
+                            f"允许更新"
+                        )
+                        return True
 
             logger.warning(
                 f"数据源就绪检查: {len(ready_codes)}/{len(kline_data)} 只有目标日期数据 "
@@ -582,7 +615,7 @@ class KlineUpdater:
         """获取统计信息"""
         return self.stats.copy()
 
-    def check_exdividend_and_rebuild(self, stock_codes: List[str], trade_date: str, start_date: str = None) -> Dict:
+    def check_exdividend_and_rebuild(self, stock_codes: List[str], trade_date: str, start_date: Optional[str] = None) -> Dict:
         """
         检测除权并在检测到除权时重建历史数据
 
