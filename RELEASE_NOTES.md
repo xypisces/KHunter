@@ -245,7 +245,7 @@ python main.py web
 5. 查看狩猎场 - 查看符合条件的优质股票
 
 ### 8.4 Web界面访问
-- 访问 `http://localhost:5001` 使用Web界面
+- 访问 `http://localhost:8080` 使用Web界面
 
 ### 8.5 PTrade自动交易（可选）
 - 将 `trading/ptrade/` 目录下的文件部署到PTrade平台

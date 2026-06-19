@@ -12,7 +12,7 @@ KHunter 是一套开箱即用的 A 股量化交易系统，集数据管理、策
 # 安装依赖（uv 会自动创建虚拟环境）
 uv sync
 
-# 启动 Web 界面（默认 http://localhost:5001）
+# 启动 Web 界面（默认 http://localhost:8080）
 uv run main.py web
 
 # 首次全量数据抓取
@@ -101,5 +101,5 @@ akshare API → utils/数据获取 → SQLite (data/stock_selection.db)
 - Python 版本要求 3.12+，包管理使用 uv（非 pip）
 - 数据目录 `data/` 在 `.gitignore` 中，不提交到仓库
 - `config/config.yaml` 包含敏感信息（钉钉 webhook），不要提交
-- Web 服务器默认端口 5001（通过 `main.py web` 启动）
+- Web 服务器默认端口 8080（通过 `main.py web` 启动）
 - 智能数据更新：15:00 前不更新，检查是否有当天数据后决定是否增量更新

@@ -15,7 +15,7 @@ import argparse
 import platform
 import logging
 from pathlib import Path
-from datetime import datetime, time as dt_time
+from datetime import datetime
 import time
 
 # 配置日志
@@ -32,9 +32,7 @@ sys.path.insert(0, str(project_root))
 __version__ = "1.0.0"
 
 from utils.akshare_fetcher import AKShareFetcher
-from utils.db_manager import DBManager
 from strategy.strategy_registry import get_registry
-from utils.kline_chart import generate_kline_chart
 from utils.db_initializer import init_databases_if_needed
 from utils.stock_filter import StockFilter
 import yaml
@@ -83,7 +81,7 @@ class QuantSystem:
             
             if stock_names:
                 return stock_names
-        except Exception as e:
+        except Exception:
             pass
         
         # 如果数据库读取失败，使用默认名称
@@ -145,7 +143,7 @@ class QuantSystem:
 
         # 执行更新
         print("\n🔄 执行数据更新...")
-        self.fetcher.daily_update(max_stocks=max_stocks)
+        self.fetcher.init_full_data(max_stocks=max_stocks, incremental=True)
         print("\n✓ 数据更新完成")
 
     def update_data(self, max_stocks=None):
@@ -153,7 +151,7 @@ class QuantSystem:
         print("=" * 60)
         print("🔄 每日增量更新")
         print("=" * 60)
-        self.fetcher.daily_update(max_stocks=max_stocks)
+        self.fetcher.init_full_data(max_stocks=max_stocks, incremental=True)
         print("\n✓ 数据更新完成")
 
     def select_stocks(self, category='all', max_stocks=None, return_data=False):
@@ -161,7 +159,7 @@ class QuantSystem:
         :param category: 股票分类筛选，'all'表示全部，其他值按分类筛选
         :param max_stocks: 限制处理的股票数量（用于快速测试）
         :param return_data: 是否返回股票数据字典（用于K线图生成）
-        :return: (results, stock_names) 或 (results, stock_names, stock_data_dict)
+        :return: (results, stock_names, indicators_dict) — indicators_dict 在 return_data=False 时为空字典
         """
         print("=" * 60)
         print("🎯 执行选股策略")
@@ -175,7 +173,7 @@ class QuantSystem:
         
         if not self.registry.list_strategies():
             print("✗ 没有找到可用策略")
-            return {}, {}
+            return {}, {}, {}
         
         print(f"已加载 {len(self.registry.list_strategies())} 个策略")
         
@@ -205,7 +203,7 @@ class QuantSystem:
         
         if not stock_codes:
             print("✗ 没有股票数据，请先执行 init 或 update")
-            return {}, {}
+            return {}, {}, {}
         
         print(f"共 {len(stock_codes)} 只股票")
         
@@ -344,16 +342,14 @@ class QuantSystem:
         if return_data:
             # 返回计算了指标的数据（包含趋势线）
             return results, stock_names, indicators_dict
-        
-        return results, stock_names
+
+        return results, stock_names, {}
     
     def run_full(self, category='all', max_stocks=None):
         """完整流程：更新 + 选股
         :param max_stocks: 限制处理的股票数量（用于快速测试）
         """
         from datetime import datetime
-        import json
-        from pathlib import Path
 
         print("=" * 60)
         print("🚀 执行完整流程")
@@ -643,8 +639,8 @@ B1完美图形匹配:
     parser.add_argument(
         '--port',
         type=int,
-        default=5000,
-        help='Web服务器端口 (默认: 5000)'
+        default=8080,
+        help='Web服务器端口 (默认: 8080)'
     )
     
     parser.add_argument(
@@ -660,7 +656,7 @@ B1完美图形匹配:
         from strategy.pattern_config import MIN_SIMILARITY_SCORE, DEFAULT_LOOKBACK_DAYS
         default_min_similarity = MIN_SIMILARITY_SCORE
         default_lookback_days = DEFAULT_LOOKBACK_DAYS
-    except:
+    except ImportError:
         default_min_similarity = 60.0
         default_lookback_days = 25
     

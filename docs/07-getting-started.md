@@ -56,7 +56,7 @@ uv run main.py run --b1-match --min-similarity 60
 
 ```bash
 uv run main.py web
-# 浏览器访问 http://localhost:5001
+# 浏览器访问 http://localhost:8080
 ```
 
 ## CLI 命令参考
@@ -126,7 +126,7 @@ uv run main.py run
 
 # 3. 或通过 Web 界面查看
 uv run main.py web
-# 浏览器打开 http://localhost:5001
+# 浏览器打开 http://localhost:8080
 ```
 
 ### 策略调优流程
