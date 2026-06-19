@@ -8,10 +8,11 @@ evt:
   gpd_fit_method: mle
   threshold_percentile: 0.95
 risk:
-  calculation_method: historical
+  calculation_method: hybrid
   confidence_level: 0.99
-  index_code: 000852.SH
-  lookback_days: 500
+  index_code: 932000.CSI
+  lookback_days: 120
+  lambda_ewma: 0.85
   risk_levels:
     危险:
       liquidate: false

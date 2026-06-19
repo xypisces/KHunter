@@ -556,9 +556,18 @@ class BacktestEngine:
                             strategy_name=strategy_name
                         )
                         kelly_amount = kelly_result['amount']
-                        position_amount = min(kelly_amount, current_capital)
-                        reserve_fee = position_amount % 100
-                        position_amount = position_amount // 100 * 100
+                        
+                        # 确定最终可用金额
+                        if current_capital >= kelly_amount:
+                            # 可用资金充足，用凯利金额，不预留费用
+                            position_amount = kelly_amount
+                            reserve_fee = 0.0
+                        else:
+                            # 可用资金不足，用可用资金，预留交易费用
+                            position_amount = current_capital
+                            reserve_fee = position_amount % 100
+                            position_amount = position_amount // 100 * 100
+                        
                         quantity = KellyCalculator.calculate_buy_quantity(
                             position_amount=position_amount,
                             price=buy_price,
@@ -2119,19 +2128,19 @@ class BacktestEngine:
                     sell_type = 'take_profit'
                     logger.info(f"  {stock_code} {stock_name} - 触发止盈: 收益率 {return_rate:.2f}% >= {take_profit}%")
                 else:
-                    # 计算当前止损线（支持移动止损，简化版）
+                    # 计算当前止损线
                     current_stop = base_stop_level  # 默认使用基础止损-6%
                     stop_price = buy_price * (1 + base_stop_level / 100)
                     
                     if enable_trailing_stop:
-                        # 简化的移动止损逻辑：
+                        # 移动止损逻辑：
                         # - 最高收益 < 5%：使用固定止损 -6%
-                        # - 最高收益 >= 5%：移动止损 = 最高收益率 - 8%
+                        # - 最高收益 >= 5%：移动止损 = 截至前一日的最高价 × 92%
                         if highest_price_return >= trailing_trigger_threshold:
-                            current_stop = highest_price_return - 8
-                            stop_price = buy_price * (1 + current_stop / 100)
+                            stop_price = current_highest_price * 0.92
+                            current_stop = (stop_price - buy_price) / buy_price * 100
                         
-                        logger.info(f"  {stock_code} {stock_name} - 移动止损: 买入价={buy_price:.2f}, 最高价={current_highest_price:.2f}, 最高价收益率={highest_price_return:.2f}%, 止损线={current_stop:.2f}%, 止损价={stop_price:.2f}")
+                        logger.info(f"  {stock_code} {stock_name} - 移动止损: 买入价={buy_price:.2f}, 最高价={current_highest_price:.2f}, 最高价收益率={highest_price_return:.2f}%, 止损价={stop_price:.2f}")
                     
                     # 检查是否触发止损（包括移动止损）
                     if open_price <= stop_price:

@@ -9,6 +9,8 @@ import sys
 import math
 from pathlib import Path
 from datetime import datetime
+from utils.trade_date_utils import is_trading_day, get_previous_trading_day
+from datetime import datetime as dt, timedelta
 import pandas as pd
 import numpy as np
 import logging
@@ -308,29 +310,47 @@ def get_stocks():
         return jsonify({'success': False, 'error': str(e)})
 
 
+def get_latest_trading_date() -> str:
+    """获取最近交易日（考虑收盘时间）
+    
+    如果今天是交易日且已收盘（15:00之后），返回今天
+    否则返回上一个交易日
+    """
+    now = datetime.now()
+    today_str = now.strftime('%Y-%m-%d')
+    
+    # 判断是否已收盘（15:00之后）
+    is_market_closed = now.hour >= 15
+    
+    if is_trading_day(today_str) and is_market_closed:
+        return today_str
+    else:
+        return get_previous_trading_day(today_str)
+
+
 @app.route('/api/dashboard/my-golden-stocks')
 def get_my_golden_stocks():
-    """获取我的金股 - 最近一个日期的top5股票"""
+    """获取我的金股 - 最近交易日的top5股票（考虑收盘时间）"""
     try:
-        # 获取最近的选股日期
-        date_result = db_manager.query("SELECT DISTINCT selection_date FROM stock_selection_record ORDER BY selection_date DESC LIMIT 1")
-        if not date_result:
-            return jsonify({
-                'success': True,
-                'date': '',
-                'stocks': []
-            })
+        # 获取最近交易日
+        target_date = get_latest_trading_date()
         
-        score_date = date_result[0]['selection_date']
-        
-        # 获取top5股票（按rank_position排序）
+        # 查询该交易日的选股记录
         rows = db_manager.query("""
             SELECT stock_code, stock_name, industry, sector, score, rank_position
             FROM stock_selection_record
             WHERE selection_date = ?
             ORDER BY rank_position ASC
             LIMIT 5
-        """, (score_date,))
+        """, (target_date,))
+        
+        # 如果没有数据，直接返回空列表
+        if not rows:
+            return jsonify({
+                'success': True,
+                'date': target_date,
+                'stocks': []
+            })
         
         # 转换为字典列表
         items = []
@@ -345,7 +365,7 @@ def get_my_golden_stocks():
         
         return jsonify({
             'success': True,
-            'date': score_date,
+            'date': target_date,
             'stocks': items
         })
     except Exception as e:
@@ -355,18 +375,10 @@ def get_my_golden_stocks():
 
 @app.route('/api/dashboard/hot-industries')
 def get_hot_industries():
-    """获取最热行业 - top50股票的行业分布"""
+    """获取最热行业 - top50股票的行业分布（考虑收盘时间）"""
     try:
-        # 获取最近的选股日期
-        date_result = db_manager.query("SELECT DISTINCT selection_date FROM stock_selection_record ORDER BY selection_date DESC LIMIT 1")
-        if not date_result:
-            return jsonify({
-                'success': True,
-                'date': '',
-                'industries': []
-            })
-        
-        score_date = date_result[0]['selection_date']
+        # 获取最近交易日
+        score_date = get_latest_trading_date()
         
         # 获取top50股票
         rows = db_manager.query("""
@@ -376,6 +388,14 @@ def get_hot_industries():
             ORDER BY rank_position ASC
             LIMIT 50
         """, (score_date,))
+        
+        # 如果没有数据，直接返回空列表
+        if not rows:
+            return jsonify({
+                'success': True,
+                'date': score_date,
+                'industries': []
+            })
         
         # 统计行业分布
         industry_count = {}
@@ -411,18 +431,10 @@ def get_hot_industries():
 
 @app.route('/api/dashboard/hot-areas')
 def get_hot_areas():
-    """获取最热板块 - top50股票的板块分布"""
+    """获取最热板块 - top50股票的板块分布（考虑收盘时间）"""
     try:
-        # 获取最近的选股日期
-        date_result = db_manager.query("SELECT DISTINCT selection_date FROM stock_selection_record ORDER BY selection_date DESC LIMIT 1")
-        if not date_result:
-            return jsonify({
-                'success': True,
-                'date': '',
-                'areas': []
-            })
-        
-        score_date = date_result[0]['selection_date']
+        # 获取最近交易日
+        score_date = get_latest_trading_date()
         
         # 获取top50股票
         rows = db_manager.query("""
@@ -432,6 +444,14 @@ def get_hot_areas():
             ORDER BY rank_position ASC
             LIMIT 50
         """, (score_date,))
+        
+        # 如果没有数据，直接返回空列表
+        if not rows:
+            return jsonify({
+                'success': True,
+                'date': score_date,
+                'areas': []
+            })
         
         # 统计板块分布
         area_count = {}
@@ -658,8 +678,8 @@ def get_stock_detail(code):
                     code_fmt = code
                 
                 # 获取最近400个交易日的数据
-                end_date = datetime.now().strftime('%Y%m%d')
-                start_date = (datetime.now() - timedelta(days=400)).strftime('%Y%m%d')
+                end_date = dt.now().strftime('%Y%m%d')
+                start_date = (dt.now() - timedelta(days=400)).strftime('%Y%m%d')
                 
                 df = pro.daily(ts_code=code_fmt, start_date=start_date, end_date=end_date)
                 
@@ -808,7 +828,7 @@ def run_selection():
     
     try:
         # 记录请求开始和时间
-        request_start_time = datetime.now()
+        request_start_time = dt.now()
         func_logger.info("=" * 60)
         func_logger.info("选股请求开始")
         
@@ -843,7 +863,7 @@ def run_selection():
 
                 # 如果end_date为空，使用当前工作日期
                 if not end_date:
-                    today = datetime.now().strftime('%Y-%m-%d')
+                    today = dt.now().strftime('%Y-%m-%d')
                     end_date = today
                     func_logger.warning(f"⚠️ end_date为空，使用当前日期: {end_date}")
 
@@ -855,18 +875,17 @@ def run_selection():
             # 检查策略列表是否为空
             if strategies_to_run is not None and len(strategies_to_run) == 0:
                 func_logger.info("策略列表为空，返回空结果")
-                return jsonify({'success': True, 'data': {}, 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+                return jsonify({'success': True, 'data': {}, 'time': dt.now().strftime('%Y-%m-%d %H:%M:%S')})
         
         # 加载股票数据
         try:
             func_logger.info("开始加载股票数据...")
             # 从数据库获取所有股票代码
             stock_codes = db_manager.list_all_stocks()
-            func_logger.info(f"加载了 {len(stock_codes)} 只股票代码")
-            
+
             # 从数据库获取所有股票名称（不再使用 stock_names.json）
             stock_names = db_manager.get_all_stock_names()
-            func_logger.info(f"加载了 {len(stock_names)} 只股票名称")
+            func_logger.info(f"加载了 {len(stock_codes)} 只股票数据")
         except Exception as e:
             func_logger.error(f"加载股票数据失败: {str(e)}")
             return jsonify({'success': False, 'error': f'加载股票数据失败: {str(e)}'})
@@ -876,7 +895,7 @@ def run_selection():
             func_logger.warning(f"⚠️ 开始加载股票数据, end_date={end_date}")
             stock_data = {}
             skip_count = 0
-            load_start_time = datetime.now()
+            load_start_time = dt.now()
             
             # 加载所有股票的完整数据
             for idx, code in enumerate(stock_codes):
@@ -897,10 +916,10 @@ def run_selection():
                 
                 # 每加载500只股票输出一次进度
                 if (idx + 1) % 500 == 0:
-                    elapsed = (datetime.now() - load_start_time).total_seconds()
+                    elapsed = (dt.now() - load_start_time).total_seconds()
                     func_logger.info(f"  加载进度: [{idx + 1}/{len(stock_codes)}] 已加载 {len(stock_data)} 只，耗时 {elapsed:.1f}秒")
             
-            load_time = (datetime.now() - load_start_time).total_seconds()
+            load_time = (dt.now() - load_start_time).total_seconds()
             func_logger.info(f"成功加载 {len(stock_data)} 只股票的K线数据，跳过 {skip_count} 只，总耗时 {load_time:.1f}秒")
         except Exception as e:
             func_logger.error(f"构建股票数据字典失败: {str(e)}")
@@ -909,7 +928,7 @@ def run_selection():
         # 检查是否有可用的股票数据
         if not stock_data:
             func_logger.warning("没有可用的股票数据")
-            return jsonify({'success': True, 'data': {}, 'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+            return jsonify({'success': True, 'data': {}, 'time': dt.now().strftime('%Y-%m-%d %H:%M:%S')})
         
         results = {}
         
@@ -935,8 +954,8 @@ def run_selection():
                     signals = []
                     error_count = 0
                     success_count = 0
-                    strategy_start_time = datetime.now()
-                    last_progress_time = datetime.now()
+                    strategy_start_time = dt.now()
+                    last_progress_time = dt.now()
                     
                     total_stocks = len(stock_data)
                     for idx, (code, (name, df)) in enumerate(stock_data.items()):
@@ -959,12 +978,12 @@ def run_selection():
                         
                         # 每500只股票输出一次进度
                         if (idx + 1) % 500 == 0:
-                            elapsed = (datetime.now() - last_progress_time).total_seconds()
+                            elapsed = (dt.now() - last_progress_time).total_seconds()
                             progress = (idx + 1) / total_stocks * 100
                             func_logger.info(f"  策略 {strategy_name} 进度: [{idx + 1}/{total_stocks}] {progress:.1f}% - 选中 {len(signals)} 只，耗时 {elapsed:.1f}秒")
-                            last_progress_time = datetime.now()
+                            last_progress_time = dt.now()
                     
-                    strategy_time = (datetime.now() - strategy_start_time).total_seconds()
+                    strategy_time = (dt.now() - strategy_start_time).total_seconds()
                     func_logger.info(f"策略 {strategy_name} 执行完成: 选中 {len(signals)} 只股票，分析成功 {success_count} 只，失败 {error_count} 只，耗时 {strategy_time:.1f}秒")
                     
                     results[strategy_name] = signals
@@ -1030,7 +1049,7 @@ def run_selection():
                     func_logger.info(f"执行策略: {strategy_name}")
                     signals = []
                     error_count = 0
-                    strategy_start_time = datetime.now()
+                    strategy_start_time = dt.now()
                     
                     # 获取该策略的中文名称
                     strategy_display_name = strategy_display_names.get(strategy_name, strategy_name)
@@ -1055,10 +1074,10 @@ def run_selection():
                         
                         # 每处理100只股票输出一次进度
                         if (idx + 1) % 100 == 0:
-                            elapsed = (datetime.now() - strategy_start_time).total_seconds()
+                            elapsed = (dt.now() - strategy_start_time).total_seconds()
                             func_logger.info(f"    {strategy_display_name} 进度: [{idx + 1}/{len(stock_data)}] 已选中 {len(signals)} 只，耗时 {elapsed:.1f}秒")
                     
-                    strategy_time = (datetime.now() - strategy_start_time).total_seconds()
+                    strategy_time = (dt.now() - strategy_start_time).total_seconds()
                     results[strategy_name] = signals
                     func_logger.info(f"策略 {strategy_name} 完成 - 选中 {len(signals)} 只股票，分析失败 {error_count} 只，总耗时 {strategy_time:.1f}秒")
                 
@@ -1084,7 +1103,7 @@ def run_selection():
                 return jsonify({'success': False, 'error': f'OR逻辑执行失败: {str(e)}'})
         
         # 返回结果
-        total_time = (datetime.now() - request_start_time).total_seconds()
+        total_time = (dt.now() - request_start_time).total_seconds()
         func_logger.info(f"选股完成 - 返回结果数: {len(results)}，总耗时 {total_time:.1f}秒")
         func_logger.info("=" * 60)
         
@@ -1262,7 +1281,7 @@ def run_selection():
                     },
                     'filter_stats': cleaned_filter_stats,
                     'b1_match': True,
-                    'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    'time': dt.now().strftime('%Y-%m-%d %H:%M:%S')
                 })
             except Exception as e:
                 func_logger.error(f"执行B1完美图形匹配失败: {str(e)}")
@@ -1275,8 +1294,8 @@ def run_selection():
             'data': cleaned_results,
             'filter_stats': cleaned_filter_stats,
             'b1_match': False,
-            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'selection_date': end_date if end_date else datetime.now().strftime('%Y-%m-%d'),  # 添加选股日期
+            'time': dt.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'selection_date': end_date if end_date else dt.now().strftime('%Y-%m-%d'),  # 添加选股日期
             'strategy_display_names': strategy_display_names  # 添加策略名称映射
         })
     
@@ -1308,9 +1327,9 @@ def save_selection():
 
         # 解析选股时间
         try:
-            selection_time = datetime.strptime(selection_time_str, '%Y-%m-%d %H:%M:%S')
+            selection_time = dt.strptime(selection_time_str, '%Y-%m-%d %H:%M:%S')
         except (ValueError, TypeError):
-            selection_time = datetime.now()
+            selection_time = dt.now()
 
         # 收集所有选股信号和策略名称
         all_signals = []
@@ -1847,7 +1866,7 @@ def trigger_update():
         global update_status
         try:
             update_status['running'] = True
-            update_status['start_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            update_status['start_time'] = dt.now().strftime('%Y-%m-%d %H:%M:%S')
             update_status['message'] = '正在更新数据...'
             emit_update_progress()
             
@@ -1856,12 +1875,12 @@ def trigger_update():
             
             update_status['success'] += 1
             update_status['message'] = '数据更新完成'
-            update_status['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            update_status['end_time'] = dt.now().strftime('%Y-%m-%d %H:%M:%S')
             emit_update_progress()
         except Exception as e:
             update_status['failed'] += 1
             update_status['message'] = f'更新失败: {str(e)}'
-            update_status['end_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            update_status['end_time'] = dt.now().strftime('%Y-%m-%d %H:%M:%S')
             emit_update_progress()
         finally:
             update_status['running'] = False
@@ -1887,20 +1906,7 @@ def get_update_status():
     })
 
 
-@app.route('/selection-history')
-def selection_history_page():
-    """
-    选股历史查询页面
-    """
-    return render_template('selection_history.html')
 
-
-@app.route('/test-select')
-def test_select_page():
-    """
-    下拉框测试页面
-    """
-    return render_template('test_select.html')
 
 
 @app.route('/api/selection-history', methods=['GET'])
@@ -2686,6 +2692,82 @@ def get_last_update_time():
         })
 
 
+@app.route('/api/data/update/rebuild-recent-exdividend', methods=['POST'])
+def rebuild_recent_exdividend():
+    """
+    重建近期（默认2个月内）发生除权的股票历史数据
+    
+    请求体：
+        {
+            'months': 2  # 可选，默认2个月
+        }
+    
+    返回：
+        {
+            'success': bool,
+            'message': str,
+            'data': {
+                'detectedCount': 检测到的除权股票数量,
+                'rebuiltCount': 成功重建的股票数量,
+                'stocks': ['股票代码列表']
+            }
+        }
+    """
+    try:
+        data = request.get_json()
+        months = data.get('months', 2)
+        
+        # 获取KlineUpdater实例
+        from utils.kline_updater import KlineUpdater
+        from utils.global_db import get_global_db
+        from utils.stock_data_fetcher import StockDataFetcher
+        
+        # 检查 Tushare 配置是否存在，没有则跳过除权重建
+        tushare_config_path = Path('config/tushare_config.json')
+        if not tushare_config_path.exists():
+            logger.info("未找到 Tushare 配置文件，跳过除权重建")
+            return jsonify({
+                'success': True,
+                'message': '未配置 Tushare，跳过除权重建',
+                'data': {'detectedCount': 0, 'rebuiltCount': 0, 'stocks': []}
+            })
+
+        fetcher = StockDataFetcher()
+        kline_updater = KlineUpdater(get_global_db(), fetcher)
+        
+        # 获取当前日期
+        from datetime import datetime, timedelta
+        end_date = datetime.now().strftime('%Y%m%d')
+        
+        # 计算开始日期（2个月前）
+        start_date = (datetime.now() - timedelta(days=months * 30)).strftime('%Y%m%d')
+        
+        # 获取所有股票代码
+        stock_codes = fetcher.get_all_stock_codes()
+        
+        # 调用现有的除权检测和重建方法
+        result = kline_updater.check_exdividend_and_rebuild(stock_codes, end_date, start_date)
+        
+        return jsonify({
+            'success': True,
+            'message': f"成功检测到 {len(result.get('exdividend_stocks', []))} 只除权股票，已重建 {len(result.get('rebuilt_stocks', []))} 只",
+            'data': {
+                'detectedCount': len(result.get('exdividend_stocks', [])),
+                'rebuiltCount': len(result.get('rebuilt_stocks', [])),
+                'stocks': result.get('rebuilt_stocks', []),
+                'startDate': start_date,
+                'endDate': end_date
+            }
+        })
+    
+    except Exception as e:
+        logger.error(f"重建近期除权股票失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
+
 @app.route('/api/data/tables/info')
 def get_tables_info():
     """
@@ -3241,10 +3323,10 @@ def _generate_trade_dates(start_date: str, end_date: str) -> list:
     Returns:
         交易日列表
     """
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timedelta
     
-    start = datetime.strptime(start_date, '%Y%m%d')
-    end = datetime.strptime(end_date, '%Y%m%d')
+    start = dt.strptime(start_date, '%Y%m%d')
+    end = dt.strptime(end_date, '%Y%m%d')
     
     dates = []
     current = start
@@ -3292,75 +3374,6 @@ def get_strategy_runner(auto_init=False):
 
 
 
-
-
-@app.route('/api/strategy/run', methods=['POST'])
-def run_strategy():
-    """
-    运行策略
-
-    参数：
-        strategies: 选股策略列表（兼容 strategy_names）
-        timing_strategy: 择时策略名称
-        config: 配置参数（包含 max_stocks 最大持仓数等）
-        end_date: 选股日期（YYYY-MM-DD格式），如果不提供则使用当前工作日期
-
-    返回：
-        {"status": "success", "message": "策略运行完成", "data": {...}}
-    """
-    try:
-        # 不自动初始化策略运行器，需要手动调用初始化接口
-        runner = get_strategy_runner(auto_init=False)
-        if not runner:
-            return jsonify({"status": "failed", "message": "策略运行器未初始化，请先调用初始化接口"})
-
-        # 获取请求参数
-        data = request.json or {}
-        # 兼容两种参数名称：strategies 和 strategy_names
-        strategy_names = data.get('strategies', data.get('strategy_names', []))
-        timing_strategy = data.get('timing_strategy', 'support')
-        config = data.get('config', {})
-        end_date = data.get('end_date')
-
-        # 如果提供了end_date，在config中设置selection_date
-        if end_date:
-            config['selection_date'] = end_date
-
-        # 从配置文件读取海龟策略参数（与回测接口保持一致）
-        if timing_strategy == 'turtle':
-            try:
-                config_manager = StrategyConfigManager()
-                turtle_config = config_manager.get_strategy_config('TurtleStrategy')
-                turtle_params = turtle_config.get('params', {})
-                logger.info(f"从配置文件读取海龟策略参数: n_entry={turtle_params.get('n_entry')}, "
-                           f"n_exit={turtle_params.get('n_exit')}, atr_period={turtle_params.get('atr_period')}")
-                
-                # 将海龟策略参数添加到config中
-                config['n_entry'] = turtle_params.get('n_entry')
-                config['n_exit'] = turtle_params.get('n_exit')
-                config['atr_period'] = turtle_params.get('atr_period')
-                config['entry_atr'] = turtle_params.get('entry_atr')
-                config['add_atr'] = turtle_params.get('add_atr')
-                config['exit_atr'] = turtle_params.get('exit_atr')
-                config['base_position_amount'] = turtle_params.get('base_position_amount')
-            except Exception as e:
-                logger.warning(f"读取海龟策略配置失败，使用默认值: {str(e)}")
-                # 使用默认值
-                config['n_entry'] = 20
-                config['n_exit'] = 10
-                config['atr_period'] = 20
-                config['entry_atr'] = 0.02
-                config['add_atr'] = 0.5
-                config['exit_atr'] = 2.0
-                config['base_position_amount'] = 20000
-
-        # 运行策略
-        result = runner.run_strategy(strategy_names, timing_strategy, config)
-
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"运行策略失败: {str(e)}")
-        return jsonify({"status": "failed", "message": str(e)})
 
 
 @app.route('/api/strategy/run-batch', methods=['POST'])
@@ -3562,14 +3575,19 @@ def get_portfolio():
             from trading.strategy_runner import StrategyRunner
             runner = StrategyRunner()
         
-        # 获取当前工作日期
+        # 获取当前工作日期（用于信号）和当日日期（用于持仓）
         working_date = runner.get_working_date()
+        today = dt.now().strftime('%Y-%m-%d')
         
         # 初始化当日数据（自动从最近有数据的交易日继承）
         runner.initialize_daily_data(working_date)
         
-        # 加载持仓信息（先读取文件中的数据，包含资金）
-        portfolio_file = runner.running_dir / f"portfolio_{working_date}.json"
+        # 【自动模式】在读取 portfolio 前，检查 PTrade 反馈是否更新
+        # 若 PTrade 反馈文件比本地 portfolio 更新，自动同步
+        runner.sync_portfolio_from_ptrade(today)
+        
+        # 加载持仓信息（使用当日日期，而非前一交易日）
+        portfolio_file = runner.running_dir / f"portfolio_{today}.json"
         # 先读取文件数据，获取资金和持仓
         file_data = {}
         if portfolio_file.exists():
@@ -3649,6 +3667,9 @@ def get_portfolio():
         total_assets = available_cash + total_value
         total_profit_percent = ((total_assets - initial_capital) / initial_capital) * 100
         
+        # 获取当前运行模式（手动/自动），前端据此控制按钮显隐
+        run_mode = getattr(runner, 'run_mode', 'manual')
+        
         # 返回持仓信息和统计数据
         return jsonify({
             "success": True, 
@@ -3659,7 +3680,8 @@ def get_portfolio():
                 "total_assets": total_assets,
                 "total_profit_percent": total_profit_percent,
                 "initial_cash": 300000,
-                "date": working_date
+                "date": working_date,
+                "run_mode": run_mode
             }
         })
     except Exception as e:
@@ -3691,6 +3713,11 @@ def sell_position():
             logger.info("策略运行器未初始化，进行初始化...")
             from trading.strategy_runner import StrategyRunner
             runner = StrategyRunner()
+        
+        # 自动模式下禁止手动卖出，以 PTrade 实际持仓为准
+        run_mode = getattr(runner, 'run_mode', 'manual')
+        if run_mode == 'auto':
+            return jsonify({"success": False, "error": "自动模式下请通过 PTrade 操作，不可手动卖出"})
         
         # 获取当前工作日期
         working_date = runner.get_working_date()
@@ -3898,7 +3925,10 @@ def get_signals():
             if 'strategy_name' in signal:
                 signal['strategy_name'] = get_chinese_name(signal['strategy_name'])
         
-        return jsonify({"success": True, "data": {"signals": signals, "date": working_date}})
+        # 获取当前运行模式，前端据此控制操作按钮显隐
+        run_mode = getattr(runner, 'run_mode', 'manual')
+        
+        return jsonify({"success": True, "data": {"signals": signals, "date": working_date, "run_mode": run_mode}})
     except Exception as e:
         logger.error(f"获取信号列表失败: {str(e)}")
         return jsonify({"success": False, "error": str(e)})
@@ -3937,8 +3967,8 @@ def get_stock_pool():
         
         # 【优化】只调用一次获取交易日列表，避免对每只股票重复查询
         # 获取历史交易日（过去60天足够了）
-        from datetime import datetime, timedelta
-        hist_start = (datetime.strptime(working_date, '%Y-%m-%d') - timedelta(days=60)).strftime('%Y-%m-%d')
+        from datetime import datetime, timedelta, timedelta
+        hist_start = (dt.strptime(working_date, '%Y-%m-%d') - timedelta(days=60)).strftime('%Y-%m-%d')
         all_trading_days = get_trading_days(hist_start, working_date)
         trading_days_set = set(all_trading_days)  # 用集合加速查找
         
@@ -4022,8 +4052,13 @@ def execute_signal(signal_id):
             logger.error(f"【路由层】策略运行器未初始化")
             return jsonify({"success": False, "message": "策略运行器未初始化"})
         
+        # 自动模式下禁止手动执行信号，信号由 PTrade 自动读取
+        run_mode = getattr(runner, 'run_mode', 'manual')
+        if run_mode == 'auto':
+            return jsonify({"success": False, "message": "自动模式下由 PTrade 自动执行，不可手动操作"})
+
         logger.info(f"【路由层】开始执行信号: {signal_id}")
-        
+
         # 调用策略运行器执行信号
         result = runner.execute_signal(signal_id)
         
@@ -4056,8 +4091,13 @@ def ignore_signal(signal_id):
         if not runner:
             return jsonify({"success": False, "message": "策略运行器未初始化"})
         
+        # 自动模式下禁止手动忽略信号
+        run_mode = getattr(runner, 'run_mode', 'manual')
+        if run_mode == 'auto':
+            return jsonify({"success": False, "message": "自动模式下由 PTrade 自动处理，不可手动操作"})
+
         logger.info(f"忽略信号: {signal_id}")
-        
+
         # 调用策略运行器忽略信号
         result = runner.ignore_signal(signal_id)
         

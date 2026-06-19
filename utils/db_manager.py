@@ -460,6 +460,7 @@ class DBManager:
         - 保存事务专用连接，确保事务内所有操作使用同一连接
         - 执行 BEGIN IMMEDIATE 立即获取写入锁，避免锁升级冲突
         - 支持嵌套事务（通过线程本地计数器实现）
+        - 自动处理连接上残留的未提交事务（脏连接恢复）
         """
         if self._transaction_count == 0:
             # 获取全局写入锁（阻塞直到获取成功）
@@ -480,6 +481,25 @@ class DBManager:
                 # BEGIN IMMEDIATE 立即获取写入锁，避免后续锁升级失败
                 conn.execute('BEGIN IMMEDIATE')
                 logger.debug("事务开始（已获取写入锁）")
+            except sqlite3.OperationalError as e:
+                # 可能是连接上残留了未提交的事务（脏连接），尝试回滚后重试
+                if 'cannot start a transaction within a transaction' in str(e):
+                    logger.warning(
+                        f"检测到脏连接（残留未提交事务），自动回滚后重试: {e}"
+                    )
+                    try:
+                        self._tx_connection.rollback()
+                        self._tx_connection.execute('BEGIN IMMEDIATE')
+                        logger.debug("脏连接恢复成功，事务开始")
+                    except sqlite3.Error as retry_e:
+                        # 恢复失败，释放写入锁并清空事务连接
+                        self._tx_connection = None
+                        self._has_write_lock = False
+                        self._write_lock.release()
+                        logger.error(f"脏连接恢复失败: {retry_e}")
+                        raise
+                else:
+                    raise
             except sqlite3.Error as e:
                 # 事务开始失败，释放写入锁并清空事务连接
                 self._tx_connection = None
@@ -497,6 +517,7 @@ class DBManager:
         - 只有最外层事务（计数器归零）才真正提交
         - 提交后清空事务专用连接
         - 释放全局写入锁
+        - 提交失败时自动回滚底层连接，避免产生脏连接
         """
         # 嵌套事务：计数器减1
         self._transaction_count -= 1
@@ -508,6 +529,12 @@ class DBManager:
                 logger.debug("事务提交成功")
             except sqlite3.Error as e:
                 logger.error(f"事务提交失败: {str(e)}")
+                # 提交失败时回滚底层连接，避免残留未提交事务（脏连接）
+                try:
+                    if self._tx_connection:
+                        self._tx_connection.rollback()
+                except Exception:
+                    pass
                 raise
             finally:
                 # 无论成功失败，都清空事务连接并释放写入锁
@@ -523,18 +550,31 @@ class DBManager:
         - 无论嵌套层级，立即回滚并重置计数器
         - 清空事务专用连接
         - 释放全局写入锁（仅当当前线程持有时）
+        - 回滚失败时强制关闭连接，确保后续操作拿到干净连接
         """
         # 记录是否需要释放锁
         had_lock = self._has_write_lock
         # 重置事务计数器
         self._transaction_count = 0
+        # 保存当前事务连接的引用（局部变量，不随属性变化）
+        tx_conn = self._tx_connection
         try:
             # 回滚事务
-            if self._tx_connection:
-                self._tx_connection.rollback()
+            if tx_conn:
+                tx_conn.rollback()
             logger.debug("事务回滚成功")
         except sqlite3.Error as e:
             logger.error(f"事务回滚失败: {str(e)}")
+            # 回滚失败意味着连接已处于不可恢复状态
+            # 关闭连接并从线程池中移除，确保下次 connect() 创建新连接
+            try:
+                if tx_conn:
+                    tx_conn.close()
+                thread_id = threading.get_ident()
+                self._connection_pool.pop(thread_id, None)
+                logger.warning("已关闭脏连接并从连接池移除")
+            except Exception as close_e:
+                logger.error(f"关闭脏连接失败: {close_e}")
         finally:
             # 清空事务连接
             self._tx_connection = None
@@ -736,15 +776,20 @@ class DBManager:
             return False
         
         try:
+            # 统一日期格式为 YYYY-MM-DD
+            from utils.date_utils import normalize_date
+            
             # 去重：按日期去重，保留最后出现的
             df = df.drop_duplicates(subset=['date'], keep='last')
             
             # 准备数据列表
             data_list = []
             for _, row in df.iterrows():
+                # 统一日期格式为 YYYY-MM-DD
+                normalized_date = normalize_date(row['date'])
                 data = {
                     'code': stock_code,
-                    'date': str(row['date']).split()[0] if hasattr(row['date'], '__str__') else row['date'],
+                    'date': normalized_date,
                     'open': float(row.get('open', 0)) if pd.notna(row.get('open')) else None,
                     'high': float(row.get('high', 0)) if pd.notna(row.get('high')) else None,
                     'low': float(row.get('low', 0)) if pd.notna(row.get('low')) else None,
@@ -872,15 +917,13 @@ class DBManager:
             str: 最晚交易日期（YYYY-MM-DD格式），如果失败返回None
         """
         try:
+            from utils.date_utils import normalize_date
             sql = "SELECT MAX(date) as max_date FROM stock_kline"
             result = self.query_one(sql)
             max_date = result['max_date'] if result and result.get('max_date') else None
             if max_date:
-                if ' ' in str(max_date):
-                    max_date = str(max_date).split()[0]
-                # 转换为 YYYY-MM-DD 格式
-                if len(str(max_date)) == 8:  # 20260430 格式
-                    max_date = f"{str(max_date)[:4]}-{str(max_date)[4:6]}-{str(max_date)[6:8]}"
+                # 使用统一的日期转换工具
+                max_date = normalize_date(max_date)
             logger.debug(f"获取最晚交易日期成功: {max_date}")
             return max_date
         except Exception as e:

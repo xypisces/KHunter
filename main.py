@@ -89,7 +89,7 @@ class QuantSystem:
         # 如果数据库读取失败，使用默认名称
         return {code: f"股票{code}" for code in stock_data.keys()}
     
-    def init_data(self, max_stocks=None, years=1):
+    def init_data(self, max_stocks=None, years=3):
         """首次全量抓取"""
         print("=" * 60)
         print("🚀 首次全量数据抓取")

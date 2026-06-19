@@ -334,28 +334,24 @@ class DataCollectionService:
                 self._add_init_log("✓ 已删除现有数据")
                 self._update_progress(10)
                 
-                # 步骤2: 使用 DataInitializer 全量初始化
-                self._add_init_log("⟳ 正在获取股票列表...")
+                # 步骤2: 使用统一初始化入口全量初始化（带进度回调）
+                self._add_init_log("⟳ 正在全量初始化...")
+
+                # 创建进度回调（映射到 10%-100% 区间）
+                def reinit_progress_cb(progress_pct, message):
+                    mapped = 10 + int(progress_pct * 0.9)  # 10 + 0~90
+                    self.init_status['current_task'] = message
+                    self._update_progress(mapped)
+
                 data_initializer = DataInitializer(
                     self.db_manager,
                     self.stock_data_fetcher,
                     None,
-                    None
+                    None,
+                    progress_callback=reinit_progress_cb
                 )
-                all_stocks = self.stock_data_fetcher.get_all_stock_codes()
-                stock_codes = list(all_stocks.keys())
-                self._add_init_log(f"  获取到 {len(stock_codes)} 只股票")
-                
-                # 步骤3: 初始化基础数据
-                self._add_init_log("⟳ 正在初始化基础数据...")
-                data_initializer._init_basic_data(stock_codes, all_stocks)
-                self._add_init_log("✓ 基础数据初始化完成")
-                self._update_progress(30)
-                
-                # 步骤4: 初始化K线数据（3年）
-                self._add_init_log("⟳ 正在初始化K线数据（3年）...")
-                data_initializer._init_kline_history_data(stock_codes, years=years)
-                self._add_init_log("✓ K线数据初始化完成")
+                data_initializer.init_full_data(years=years)
+                self._add_init_log("✓ 全量初始化完成")
                 self._update_progress(100)
                 
                 self.init_status['status'] = 'completed'
@@ -474,151 +470,44 @@ class DataCollectionService:
                 except ImportError:
                     pass
                 
-                # 初始化数据（仅支持自定义初始化）
-                if init_type == 'custom':
-                    # 自定义初始化
-                    total_tasks = 0
-                    completed_tasks = 0
-                    
-                    # 计算总任务数
-                    if options.get('basicData'):
-                        total_tasks += 1
-                    if options.get('historyData'):
-                        total_tasks += 1
-                    if options.get('industryData'):
-                        total_tasks += 1
-                    if options.get('sectorData'):
-                        total_tasks += 1
-                    if options.get('fundFlowData'):
-                        total_tasks += 1
-                    
-                    # 初始化股票列表
+                # 初始化数据（统一入口，带进度回调）
+                if init_type == 'custom' or init_type == 'full':
+                    # 使用统一初始化入口
+                    self.init_status['current_task'] = '初始化基础数据和K线'
+                    self._add_init_log("⟳ 正在初始化数据...")
+
+                    try:
+                        from web_server import emit_init_progress
+                        emit_init_progress()
+                    except ImportError:
+                        pass
+
+                    # 获取股票列表
                     stock_dict = self.akshare_fetcher.get_all_stock_codes()
-                    stock_codes = list(stock_dict.keys()) if stock_dict else []
-                    
-                    # 初始化采集器
-                    self.akshare_fetcher._init_collectors()
-                    
-                    # 初始化基础数据
-                    if options.get('basicData'):
-                        self.init_status['current_task'] = '初始化基础数据'
-                        self._add_init_log("⟳ 正在初始化基础数据...")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                        
-                        # 传入stock_dict参数，避免重复获取股票数据
-                        self.akshare_fetcher._init_basic_data(stock_codes, stock_dict)
-                        completed_tasks += 1
-                        self.init_status['progress'] = int((completed_tasks / total_tasks) * 100)
-                        self._add_init_log("✓ 基础数据初始化完成")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                    
-                    # 初始化历史行情数据
-                    if options.get('historyData'):
-                        self.init_status['current_task'] = '初始化历史行情数据'
-                        self._add_init_log("⟳ 正在初始化历史行情数据...")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                        
-                        self.akshare_fetcher._init_history_data(stock_codes)
-                        completed_tasks += 1
-                        self.init_status['progress'] = int((completed_tasks / total_tasks) * 100)
-                        self._add_init_log("✓ 历史行情数据初始化完成")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                    
-                    # 初始化行业数据
-                    if options.get('industryData'):
-                        self.init_status['current_task'] = '初始化行业数据'
-                        self._add_init_log("⟳ 正在初始化行业数据...")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                        
-                        self.akshare_fetcher._init_industry_data(stock_codes)
-                        completed_tasks += 1
-                        self.init_status['progress'] = int((completed_tasks / total_tasks) * 100)
-                        self._add_init_log("✓ 行业数据初始化完成")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                    
-                    # 初始化板块数据
-                    if options.get('sectorData'):
-                        self.init_status['current_task'] = '初始化板块数据'
-                        self._add_init_log("⟳ 正在初始化板块数据...")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                        
-                        self.akshare_fetcher._init_sector_data(stock_codes)
-                        completed_tasks += 1
-                        self.init_status['progress'] = int((completed_tasks / total_tasks) * 100)
-                        self._add_init_log("✓ 板块数据初始化完成")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                    
-                    # 初始化资金流向数据
-                    if options.get('fundFlowData'):
-                        self.init_status['current_task'] = '初始化资金流向数据'
-                        self._add_init_log("⟳ 正在初始化资金流向数据...")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
-                        
-                        self.akshare_fetcher._init_fund_flow_data(stock_codes)
-                        completed_tasks += 1
-                        self.init_status['progress'] = int((completed_tasks / total_tasks) * 100)
-                        self._add_init_log("✓ 资金流向数据初始化完成")
-                        
-                        # 尝试导入并调用WebSocket推送函数
-                        try:
-                            from web_server import emit_init_progress
-                            emit_init_progress()
-                        except ImportError:
-                            pass
+
+                    # 创建进度回调（映射到 0%-100%）
+                    def init_progress_cb(progress_pct, message):
+                        self.init_status['current_task'] = message
+                        self._update_progress(progress_pct)
+
+                    # 使用 DataInitializer 统一入口
+                    data_initializer = DataInitializer(
+                        self.db_manager,
+                        self.stock_data_fetcher,
+                        None,
+                        None,
+                        progress_callback=init_progress_cb
+                    )
+                    data_initializer.init_full_data(years=3, stock_dict=stock_dict)
+
+                    self.init_status['progress'] = 100
+                    self._add_init_log("✓ 数据初始化完成")
+
+                    try:
+                        from web_server import emit_init_progress
+                        emit_init_progress()
+                    except ImportError:
+                        pass
                 
                 # 完成
                 self.init_status['progress'] = 100
@@ -879,7 +768,7 @@ class DataCollectionService:
                 )
                 
                 # 执行新股票检测和初始化
-                new_stock_result = detector.detect_and_init_new_stocks(years=1, days=30)
+                new_stock_result = detector.detect_and_init_new_stocks(years=3, days=30)
                 
                 # 更新统计信息
                 with self.update_lock:
@@ -923,16 +812,16 @@ class DataCollectionService:
             try:
                 last_update_date = validator.get_last_update_date()
                 
-                # 如果没有记录，使用默认日期（30天前）
+                # 如果没有记录，使用默认日期（3天前）
                 if not last_update_date:
-                    last_update_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+                    last_update_date = (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d')
                 
                 self._add_update_log(f"✓ 上次更新日期: {last_update_date}")
             
             except Exception as e:
                 self._add_update_log(f"✗ 查询上次更新日期失败: {str(e)}")
                 logger.error(f"查询上次更新日期失败: {str(e)}")
-                last_update_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+                last_update_date = (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d')
             
             # 【第5步】更新K线数据
             if not update_types or 'kline' in update_types:
@@ -942,12 +831,12 @@ class DataCollectionService:
                     stock_data_fetcher = StockDataFetcher()
                     kline_updater = KlineUpdater(self.db_manager, stock_data_fetcher)
                     
-                    # 执行K线数据更新（使用优化后的批次大小500）
+                    # 执行K线数据更新（TickFlow 批量接口，一次请求全批次）
                     kline_result = kline_updater.update_kline_data(
                         stock_codes=stock_codes,
                         last_update_date=last_update_date,
                         target_date=target_date,
-                        batch_size=500  # 优化：从100增加到500
+                        batch_size=100  # TickFlow API每批最大100只股票
                     )
                     
                     # 更新统计信息
@@ -959,9 +848,17 @@ class DataCollectionService:
                     # 记录结果
                     if kline_result['success']:
                         self._add_update_log(f"✓ K线数据更新完成: 新增 {kline_result['added']} 条，更新 {kline_result['updated']} 条，失败 {kline_result['failed']} 条，耗时 {kline_result['total_time']:.1f}秒")
-                    else:
-                        self._add_update_log(f"✗ K线数据更新失败: {kline_result.get('message', '未知错误')}")
-                        logger.warning(f"K线数据更新失败: {kline_result.get('message', '未知错误')}")
+                        
+                        # 如果数据源尚未就绪，直接退出整个更新流程
+                        if '数据源尚未就绪' in kline_result.get('message', ''):
+                            self._add_update_log(f"⚠ 数据源尚未就绪，跳过本次更新（不执行资金流向更新）")
+                            logger.info(f"数据源尚未就绪，跳过本次更新")
+                            # 标记更新完成（虽然被跳过，但仍是一个合法的完成状态）
+                            # 否则前端会因 status='running' 而一直显示"更新中"
+                            self.update_status['status'] = 'completed'
+                            self.update_status['end_time'] = datetime.now().isoformat()
+                            self.update_status['message'] = '数据源尚未就绪，已跳过本次更新'
+                            return
                 
                 except Exception as e:
                     self._add_update_log(f"✗ K线数据更新异常: {str(e)}")
@@ -1124,10 +1021,17 @@ class DataCollectionService:
             total_added = self.update_status['totalStats']['kline_added'] + self.update_status['totalStats']['fund_flow_added']
             total_updated = self.update_status['totalStats']['kline_updated'] + self.update_status['totalStats']['fund_flow_updated']
             total_success = total_added + total_updated
+            total_failed = self.update_status['totalStats']['kline_failed'] + self.update_status['totalStats']['fund_flow_failed']
             
             # 更新任务状态
             with self.update_lock:
-                if total_success > 0:
+                # 如果失败数量超过1000，标记为失败（即使有成功的数据）
+                if total_failed > 1000:
+                    self.update_status['status'] = 'failed'
+                    self.update_status['end_time'] = datetime.now().isoformat()
+                    self.update_status['message'] = f'更新失败: 失败股票数量({total_failed})超过1000，请重新更新'
+                    self.update_status['success'] = 0
+                elif total_success > 0:
                     # 有数据被成功更新，标记为完成
                     self.update_status['status'] = 'completed'
                     self.update_status['end_time'] = datetime.now().isoformat()
@@ -1139,7 +1043,10 @@ class DataCollectionService:
                     self.update_status['end_time'] = datetime.now().isoformat()
                     self.update_status['message'] = '更新失败: 没有数据被成功更新'
             
-            if total_success > 0:
+            if total_failed > 1000:
+                self._add_update_log(f"✗ 更新任务失败: 失败股票数量({total_failed})超过1000")
+                logger.warning(f"更新任务 {task_id} 失败: 失败股票数量({total_failed})超过1000")
+            elif total_success > 0:
                 self._add_update_log("✓ 更新任务完成")
                 logger.info(f"更新任务 {task_id} 完成")
             else:
@@ -1149,10 +1056,13 @@ class DataCollectionService:
             # 记录更新完成或失败
             if validator and target_date:
                 try:
-                    if total_success > 0:
+                    if total_failed <= 1000 and total_success > 0:
                         validator.record_update_complete(target_date, stats)
                     else:
-                        validator.record_update_failed(target_date, '没有数据被成功更新')
+                        if total_failed > 1000:
+                            validator.record_update_failed(target_date, f'失败股票数量({total_failed})超过1000')
+                        else:
+                            validator.record_update_failed(target_date, '没有数据被成功更新')
                 except Exception as log_e:
                     logger.error(f"记录更新状态失败: {str(log_e)}")
             
@@ -1161,9 +1071,16 @@ class DataCollectionService:
             total_added = self.update_status['totalStats']['kline_added'] + self.update_status['totalStats']['fund_flow_added']
             total_updated = self.update_status['totalStats']['kline_updated'] + self.update_status['totalStats']['fund_flow_updated']
             total_success = total_added + total_updated
+            total_failed = self.update_status['totalStats']['kline_failed'] + self.update_status['totalStats']['fund_flow_failed']
             
             with self.update_lock:
-                if total_success > 0:
+                # 如果失败数量超过1000，标记为失败（即使有成功的数据）
+                if total_failed > 1000:
+                    self.update_status['status'] = 'failed'
+                    self.update_status['end_time'] = datetime.now().isoformat()
+                    self.update_status['message'] = f'更新失败: 失败股票数量({total_failed})超过1000，请重新更新'
+                    self.update_status['success'] = 0
+                elif total_success > 0:
                     # 有数据被成功更新，标记为完成
                     self.update_status['status'] = 'completed'
                     self.update_status['end_time'] = datetime.now().isoformat()
@@ -1175,7 +1092,10 @@ class DataCollectionService:
                     self.update_status['end_time'] = datetime.now().isoformat()
                     self.update_status['message'] = f'更新失败: {str(e)}'
             
-            if total_success > 0:
+            if total_failed > 1000:
+                self._add_update_log(f"✗ 更新任务失败: 失败股票数量({total_failed})超过1000")
+                logger.warning(f"更新任务 {task_id} 失败: 失败股票数量({total_failed})超过1000")
+            elif total_success > 0:
                 self._add_update_log(f"✓ 更新任务完成（部分步骤失败）: {str(e)}")
                 logger.warning(f"更新任务 {task_id} 完成（部分步骤失败）: {str(e)}")
             else:
@@ -1185,10 +1105,13 @@ class DataCollectionService:
             # 记录更新完成或失败
             if validator and target_date:
                 try:
-                    if total_success > 0:
+                    if total_failed <= 1000 and total_success > 0:
                         validator.record_update_complete(target_date, stats)
                     else:
-                        validator.record_update_failed(target_date, str(e))
+                        if total_failed > 1000:
+                            validator.record_update_failed(target_date, f'失败股票数量({total_failed})超过1000')
+                        else:
+                            validator.record_update_failed(target_date, str(e))
                 except Exception as log_e:
                     logger.error(f"记录更新状态失败: {str(log_e)}")
         

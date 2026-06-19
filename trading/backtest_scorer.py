@@ -21,7 +21,7 @@ from typing import List, Dict, Tuple, Optional
 from datetime import datetime, timedelta
 
 from trading.stock_score_models import (
-    StockScore, SCORE_WEIGHTS, VETO_SCORE
+    StockScore, SCORE_WEIGHTS, VETO_SCORE, STRATEGY_CLASS_NAME_MAP
 )
 from trading.technical_scorer import (
     STRATEGY_WEIGHTS, VETO_STRATEGIES as TECH_VETO_STRATEGIES,
@@ -470,12 +470,19 @@ class BacktestScoreCalculator:
                     strategy_weight = 0
                     for s in hit_strategies:
                         weight = STRATEGY_WEIGHTS.get(s, 0)
+                        # 如果直接匹配失败，尝试添加策略后缀
                         if weight == 0 and not s.endswith('策略'):
                             name_with_suffix = s + '策略'
                             weight = STRATEGY_WEIGHTS.get(name_with_suffix, 0)
+                        # 如果仍然失败，尝试去掉策略后缀
                         if weight == 0 and s.endswith('策略'):
                             name_without_suffix = s[:-2]
                             weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
+                        # 如果仍然失败，尝试使用类名映射
+                        if weight == 0:
+                            chinese_name = STRATEGY_CLASS_NAME_MAP.get(s, '')
+                            if chinese_name:
+                                weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                         strategy_weight += weight
                     
                     # 综合评分 = 技术面评分（策略权重）
@@ -490,7 +497,18 @@ class BacktestScoreCalculator:
                     stock['veto_reason'] = ''
                     stock['veto_dimension'] = ''
                     stock['score_level'] = '中性'
-                    stock['strategy_details'] = [{'name': s, 'weight': STRATEGY_WEIGHTS.get(s, 0) if STRATEGY_WEIGHTS.get(s, 0) != 0 else (STRATEGY_WEIGHTS.get(s + '策略', 0) if not s.endswith('策略') else STRATEGY_WEIGHTS.get(s[:-2], 0))} for s in hit_strategies]
+                    stock['strategy_details'] = []
+                    for s in hit_strategies:
+                        weight = STRATEGY_WEIGHTS.get(s, 0)
+                        if weight == 0 and not s.endswith('策略'):
+                            weight = STRATEGY_WEIGHTS.get(s + '策略', 0)
+                        if weight == 0 and s.endswith('策略'):
+                            weight = STRATEGY_WEIGHTS.get(s[:-2], 0)
+                        if weight == 0:
+                            chinese_name = STRATEGY_CLASS_NAME_MAP.get(s, '')
+                            if chinese_name:
+                                weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
+                        stock['strategy_details'].append({'name': s, 'weight': weight})
                     stock['total_strategy_weight'] = strategy_weight
                     scored_stocks.append(stock)
                     continue
@@ -524,7 +542,18 @@ class BacktestScoreCalculator:
                         name_without_suffix = s[:-2]
                         weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
                     strategy_weight += weight
-                stock['strategy_details'] = [{'name': s, 'weight': STRATEGY_WEIGHTS.get(s, 0) if STRATEGY_WEIGHTS.get(s, 0) != 0 else (STRATEGY_WEIGHTS.get(s + '策略', 0) if not s.endswith('策略') else STRATEGY_WEIGHTS.get(s[:-2], 0))} for s in hit_strategies]
+                stock['strategy_details'] = []
+                for s in hit_strategies:
+                    weight = STRATEGY_WEIGHTS.get(s, 0)
+                    if weight == 0 and not s.endswith('策略'):
+                        weight = STRATEGY_WEIGHTS.get(s + '策略', 0)
+                    if weight == 0 and s.endswith('策略'):
+                        weight = STRATEGY_WEIGHTS.get(s[:-2], 0)
+                    if weight == 0:
+                        chinese_name = STRATEGY_CLASS_NAME_MAP.get(s, '')
+                        if chinese_name:
+                            weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
+                    stock['strategy_details'].append({'name': s, 'weight': weight})
                 stock['total_strategy_weight'] = strategy_weight
                 
                 # 记录每只股票的各维度评分

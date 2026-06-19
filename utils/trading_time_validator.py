@@ -49,30 +49,44 @@ class TradingTimeValidator:
         current_minute = now.minute
         current_time_minutes = current_hour * 60 + current_minute
         
+        # 先判断今天是否为交易日
+        today_str = now.strftime("%Y-%m-%d")
+        is_today_trading_day = self._is_trading_day(today_str)
+        
         # 计算交易时间的分钟数
         trading_start_minutes = self.TRADING_START_HOUR * 60 + self.TRADING_START_MINUTE
         trading_end_minutes = self.TRADING_END_HOUR * 60 + self.TRADING_END_MINUTE
         
-        # 判断当前时间段
-        if trading_start_minutes <= current_time_minutes < trading_end_minutes:
+        # 判断当前时间段（仅交易日才限制交易时段内不可更新）
+        if is_today_trading_day and trading_start_minutes <= current_time_minutes < trading_end_minutes:
             # 在交易时间内，不允许更新
             return False, "交易时间不允许更新", ""
         
         # 确定目标更新日期
-        if current_time_minutes < trading_start_minutes:
-            # 交易前（00:00-09:30），更新到前一天数据
-            target_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        if is_today_trading_day:
+            # 交易日：按时间划分
+            if current_time_minutes < trading_start_minutes:
+                # 交易前（00:00-09:30），更新到前一天数据
+                target_date = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+            else:
+                # 收盘后（15:00-23:59），更新到当天数据
+                target_date = today_str
         else:
-            # 收盘后（15:00-23:59），更新到当天数据
-            target_date = now.strftime("%Y-%m-%d")
+            # 非交易日：目标日期为最近一个交易日
+            target_date = self._get_last_trading_day(today_str)
+            if not target_date:
+                return False, "无法确定有效的目标更新日期", ""
+            logger.info(f"今天非交易日，目标更新日期为最近交易日: {target_date}")
+            # 非交易日跳过已更新检查，直接允许
+            return True, "", target_date
         
-        # 检查目标日期是否为交易日
+        # 检查目标日期是否为交易日（交易日，目标日期可能不是交易日如凌晨时段）
         if not self._is_trading_day(target_date):
             # 如果目标日期不是交易日，找到最近的一个交易日
             target_date = self._get_last_trading_day(target_date)
             if not target_date:
                 return False, "无法确定有效的目标更新日期", ""
-            logger.info(f"当前日期非交易日，调整目标更新日期为: {target_date}")
+            logger.info(f"目标日期非交易日，调整目标更新日期为: {target_date}")
         
         # 检查是否已在目标日期更新过
         is_updated, error_msg = self._check_if_updated(target_date)

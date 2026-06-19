@@ -32,20 +32,40 @@
 - `config/strategy_weights.json` - 策略权重配置
 - `config/data_sources.json` - 数据源配置
 - `config/database.yaml` - 数据库配置
-- `config/risk_config.yaml` - 风险控制配置（新增）
+- `config/risk_config.yaml` - 风险控制配置
 - `config/strategy_kelly_config.yaml` - 凯利公式配置
 - `config/strategy_name_mapping.yaml` - 策略名称映射
 - `config/support_methods.yaml` - 支撑位计算方法
 - `config/pool_removal_config.yaml` - 股票池移除配置
+- `config/continuous_temp_risk.yaml` - 连续温度风险配置（新增）
 
 ### 数据库脚本
 - `data/DataSql.sql` - 数据库结构脚本
+- `data/InitData.sql` - 初始化数据脚本（如有）
 
 ### 图片资源
 - `image/imp.jpeg` - 系统界面截图
 
 ### 策略文件
-- `strategy/*.py` - 所有策略实现文件（13个选股策略）
+- `strategy/*.py` - 所有策略实现文件（15个选股策略）
+  - `strategy/base_strategy.py` - 策略基类
+  - `strategy/bottom_trend_inflection.py` - 底部趋势拐点
+  - `strategy/limit_up_pullback_strategy.py` - 涨停回马枪
+  - `strategy/limit_up_sideways_strategy.py` - 涨停横盘
+  - `strategy/morning_star.py` - 启明星策略
+  - `strategy/multi_golden_cross.py` - 多金叉共振
+  - `strategy/multi_party_cannon.py` - 多方炮策略
+  - `strategy/immortal_guidance_strategy.py` - 仙人指路
+  - `strategy/resistance_breakout.py` - 阻力位突破
+  - `strategy/strong_wash_weak_to_strong.py` - 强势洗盘弱转强
+  - `strategy/trend_acceleration_inflection.py` - 趋势加速拐点
+  - `strategy/trend_start_strategy.py` - 趋势起点策略
+  - `strategy/w_bottom_strategy.py` - W底策略
+  - `strategy/strategy_2560_selection.py` - 2560战法
+  - `strategy/golden_triangle_strategy.py` - 金三角策略（新增）
+  - `strategy/golden_cross_not_green.py` - 金叉不绿策略（新增）
+- `strategy/parallel_strategy_executor.py` - 并行策略执行器
+- `strategy/strategy_registry.py` - 策略注册表
 
 ### 股票分析器文件
 - `stock_analyzer/*.py` - 所有股票分析器模块
@@ -59,26 +79,56 @@
 
 ### 交易相关文件
 - `trading/*.py` - 所有交易相关代码
+  - `trading/strategy_runner.py` - 策略运行器
   - `trading/backtest_engine.py` - 回测引擎
   - `trading/backtest_dao.py` - 回测数据访问
   - `trading/backtest_batch_queue.py` - 批量回测队列
+  - `trading/backtest_scorer.py` - 回测评分器
+  - `trading/bollinger_strategy.py` - 布林带策略
+  - `trading/rsi_strategy.py` - RSI策略
+  - `trading/support_strategy.py` - 支撑位策略
+  - `trading/turtle_strategy.py` - 海龟策略
+  - `trading/macd_bollinger_strategy.py` - 顺势宝策略
+  - `trading/timing_strategies.py` - 择时策略集合
   - `trading/khunter_api.py` - 狩猎场API
   - `trading/khunter_dao.py` - 狩猎场数据访问
   - `trading/stock_score_api.py` - 股票评分API
   - `trading/stock_score_calculator.py` - 股票评分计算
-  - `trading/strategy_runner.py` - 策略运行器（新增）
-  - `trading/macd_bollinger_strategy.py` - 顺势宝策略（新增）
+  - `trading/retry_handler.py` - API重试处理
+  - `trading/structured_logger.py` - 结构化日志器
+  - `trading/trading_plan_generator.py` - 交易计划生成
+  - `trading/strategy_kelly_loader.py` - 凯利公式加载器
+  - `trading/vectorbt_backtest_engine.py` - VectorBT回测引擎
+  - `trading/vectorbt_strategies.py` - VectorBT策略定义
+- `trading/ptrade/` - PTrade自动交易模块（新增）
+  - `trading/ptrade/__init__.py` - 包初始化
+  - `trading/ptrade/khunter_auto_trade.py` - KHunter自动交易主程序
+  - `trading/ptrade/ptrade_feedback.py` - PTrade交易反馈
+  - `trading/ptrade/ptradesample.py` - PTrade接入示例
 
 ### 工具类文件
 - `utils/*.py` - 所有工具类文件
   - `utils/log_config.py` - 日志配置与自动清理
-  - `utils/risk_manager.py` - 风险管理（新增）
-  - `utils/risk_controller.py` - 风险控制器（新增）
-  - `utils/var_calculator.py` - VaR计算器（新增）
-  - `utils/risk_config_loader.py` - 风险配置加载器（新增）
+  - `utils/risk_manager.py` - 风险管理
+  - `utils/risk_controller.py` - 风险控制器
+  - `utils/var_calculator.py` - VaR计算器
+  - `utils/risk_config_loader.py` - 风险配置加载器
   - `utils/akshare_fetcher.py` - AKShare数据获取
+  - `utils/kline_fetcher.py` - K线数据获取
+  - `utils/kline_updater.py` - K线数据更新
+  - `utils/kline_initializer.py` - K线数据初始化
+  - `utils/data_initializer.py` - 数据初始化器
   - `utils/data_collection_service.py` - 数据采集服务
   - `utils/feature_config_checker.py` - 配置文件检测
+  - `utils/continuous_temp_risk.py` - 连续温度风险（新增）
+  - `utils/date_utils.py` - 日期工具类（新增）
+  - `utils/exdividend_utils.py` - 除权除息检测工具
+  - `utils/stock_data_fetcher.py` - 股票数据获取器
+  - `utils/new_stock_detector.py` - 新股检测器
+  - `utils/crypto_utils.py` - 加密工具
+  - `utils/strategy_name_mapper.py` - 策略名称映射
+  - `utils/trade_date_utils.py` - 交易日历工具
+  - `utils/trading_time_validator.py` - 交易时间验证
 
 ### 前端文件
 
@@ -99,7 +149,7 @@
 - `web/static/js/trading.js` - 交易功能
 - `web/static/js/error_handler.js` - 错误处理
 - `web/static/js/retry_policy.js` - 重试策略
-- `web/static/js/dashboard_stats.js` - 看板统计（新增）
+- `web/static/js/dashboard_stats.js` - 看板统计
 
 #### 静态资源 - JavaScript 模块 (modules/)
 - `web/static/js/modules/navigation.js` - 页面导航
@@ -123,8 +173,8 @@
 - `web/static/js/modules/execution-plan.js` - 执行计划
 - `web/static/js/modules/market_temperature.js` - 市场温度
 - `web/static/js/modules/money_flow.js` - 资金流向
-- `web/static/js/modules/risk.js` - 风险控制（新增）
-- `web/static/js/modules/strategy-runner.js` - 策略运行器（新增）
+- `web/static/js/modules/risk.js` - 风险控制
+- `web/static/js/modules/strategy-runner.js` - 策略运行器
 
 #### 静态资源 - 图片
 - `web/static/images/logo.svg` - 系统Logo
@@ -141,15 +191,27 @@
 
 ### 数据库文件
 - `stock_selection.db` - 本地数据库文件（运行时自动创建）
+- `trading_data.db` - 交易数据库文件（运行时自动创建）
 
 ### 测试文件
 - `test/` - 测试目录
 - `test_*.py` - 测试脚本
+- `_*.py` - 临时脚本（下划线开头）
+
+### 敏感配置文件（不发布）
+- `config/config.yaml` - 本地配置（含API密钥）
+- `config/87659999.json` - 加密配置文件
+- `config/87659999_decrypted.json` - 解密配置文件
+- `config/tushare_config.json` - Tushare API配置（含Token）
+- `config/config_files_info.json` - 配置信息文件
 
 ### IDE配置文件
 - `.kiro/` - Kiro IDE配置
 - `.vscode/` - VS Code配置
 - `.git/` - Git版本控制目录
+- `.pytest_cache/` - Pytest缓存
+- `.trae/` - Trae IDE配置
+- `.codebuddy/` - CodeBuddy配置
 
 ### 其他临时文件
 - `*.log` - 日志文件
@@ -157,66 +219,76 @@
 - `*.swp` - Vim交换文件
 - `*.tmp` - 临时文件
 - `*.zip` - 压缩包文件
-- `sync_files.py` - 临时同步脚本
-- `cleanup_khunter.py` - 临时清理脚本
+- `*.mp4` - 视频文件
+- `*.pptx` - 演示文稿
+- `venv/` - Python虚拟环境目录
 
 ## 发布检查清单
 
 ### 前端功能验证
-- [x] 页面导航菜单正常工作
-- [x] 所有JavaScript模块正确加载
-- [x] CSS样式表完整
-- [x] 图片资源完整（Logo、Favicon、系统截图）
-- [x] 数据加载显示正确（暂无数据vs加载中）
-- [x] 所有API端点可访问
-- [x] 策略运行器菜单显示正常（有配置文件时）
+- [ ] 页面导航菜单正常工作
+- [ ] 所有JavaScript模块正确加载
+- [ ] CSS样式表完整
+- [ ] 图片资源完整（Logo、Favicon、系统截图）
+- [ ] 数据加载显示正确（暂无数据vs加载中）
+- [ ] 所有API端点可访问
+- [ ] 策略运行器菜单显示正常（有配置文件时）
+- [ ] 数据更新进度状态正确显示
 
 ### 后端功能验证
-- [x] 数据库初始化脚本完整
-- [x] 所有Python依赖已列出
-- [x] 配置文件模板正确
-- [x] 策略实现完整（13个选股策略）
-- [x] 择时策略完整（5个）
-- [x] 风险控制模块完整
-- [x] 策略运行器功能正常
+- [ ] 数据库初始化脚本完整
+- [ ] 所有Python依赖已列出
+- [ ] 配置文件模板正确
+- [ ] 策略实现完整（15个选股策略）
+- [ ] 择时策略完整（5个）
+- [ ] 金三角策略功能正常（新增）
+- [ ] PTrade自动交易模块正常（新增）
+- [ ] 除权检测功能正常
+- [ ] 风险控制模块完整
+- [ ] 策略运行器功能正常
 
 ### 文档完整性
-- [x] README.md包含完整说明（含Logo、系统截图、五维度评分体系详解）
-- [x] RELEASE_NOTES.md版本信息更新
-- [x] RELEASE_FILES.md发布清单完整
-- [x] 所有策略说明书已包含（12个）
-- [x] 安装和使用指南清晰
+- [ ] README.md包含完整说明（含Logo、系统截图、五维度评分体系详解）
+- [ ] RELEASE_NOTES.md版本信息更新
+- [ ] RELEASE_FILES.md发布清单完整
+- [ ] 安装和使用指南清晰
 
 ## 发布版本信息
 
-**发布日期**: 2026-05-26
-**版本**: 1.4.0
+**发布日期**: 2026-06-19
+**版本**: 1.5.0
 **状态**: 生产就绪
 
-### 版本更新内容
+### v1.5.0 版本更新内容
 
 #### 新增策略
-- **选股策略**：趋势起点策略、2560战法
-- **择时策略**：顺势宝策略（MACD金叉 + 布林带上穿中轨）
-
+- **选股策略**：金三角策略（GoldenTriangleStrategy）、金叉不绿策略（GoldenCrossNotGreen）
 #### 新增功能模块
-- **策略运行器**：自动化策略执行，支持配置检测
-- **风险控制模块**：VaR风险评估、风险控制器
-- **日志管理**：自动清理10天前日志
+- **PTrade自动交易**：集成PTrade交易平台，支持自动交易闭环（`trading/ptrade/`目录）
+  - KHunter自动交易主程序
+  - PTrade交易反馈机制
+  - PTrade接入示例代码
+- **连续温度风险**：基于市场温度的连续风险监控（`utils/continuous_temp_risk.py`）
+- **日期工具类**：统一的日期处理工具（`utils/date_utils.py`）
+- **除权检测**：K线数据除权检测与自动修复
 
-#### 新增文件
-- `strategy/trend_start_strategy.py` - 趋势起点策略
-- `strategy/strategy_2560_selection.py` - 2560战法
-- `trading/strategy_runner.py` - 策略运行器
-- `trading/macd_bollinger_strategy.py` - 顺势宝策略
-- `utils/risk_manager.py` - 风险管理
-- `utils/risk_controller.py` - 风险控制器
-- `utils/var_calculator.py` - VaR计算器
-- `utils/risk_config_loader.py` - 风险配置加载器
-- `config/risk_config.yaml` - 风险配置文件
-- `image/imp.jpeg` - 系统界面截图
+#### 新增配置文件
+- `config/continuous_temp_risk.yaml` - 连续温度风险配置
 
-#### 文档更新
-- README.md：添加Logo和系统截图，更新策略列表
-- RELEASE_NOTES.md：更新版本信息和新增功能说明
-- RELEASE_FILES.md：更新发布清单
+#### 技术优化
+- 数据源切换至 TickFlow 免费批量 API
+- K线初始化改为批量 TickFlow + 腾讯财经降级
+- 科创板(688) volume 单位统一为「手」
+- 全面修复策略中的未来函数问题
+- 修复停牌检查逻辑，区分交易日和非交易日
+- 数据更新状态前端修复（数据源未就绪时正确结束）
+- 策略运行器修复：持仓文件名搜索使用 today 而非 working_date
+- 初始化数据默认获取3年K线（原1年）
+- 自动补充温度数据最多5天
+
+### v1.4.0 (2026-05-26) 历史版本
+- 新增趋势起点策略、2560战法
+- 新增顺势宝策略（MACD金叉 + 布林带）
+- 新增风险控制模块
+- 新增策略运行器
+- 新增日志管理
