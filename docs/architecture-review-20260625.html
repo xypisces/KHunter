@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>架构审查 — KHunter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 6 4; }
+      .leak { stroke: #dc2626; stroke-width: 2px; }
+      .deep-box {
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: #e2e8f0;
+        border: 2px solid #334155;
+      }
+      .shallow-box {
+        background: #f8fafc;
+        border: 2px dashed #94a3b8;
+        color: #475569;
+      }
+      .module-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-family: ui-monospace, monospace;
+      }
+      .badge-strong { background: #059669; color: white; }
+      .badge-worth { background: #d97706; color: white; }
+      .badge-speculative { background: #64748b; color: white; }
+      .diagram-container {
+        min-height: 320px;
+        display: flex;
+        gap: 1.5rem;
+      }
+      .diagram-side {
+        flex: 1;
+        min-width: 0;
+      }
+      .cross-section-band {
+        height: 2.5rem;
+        border-left: 4px solid;
+        display: flex;
+        align-items: center;
+        padding-left: 0.75rem;
+        font-size: 0.75rem;
+        font-family: ui-monospace, monospace;
+      }
+      .mass-interface {
+        background: #e2e8f0;
+        border: 2px solid #94a3b8;
+        border-radius: 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .mass-impl {
+        background: #f1f5f9;
+        border: 1px dashed #cbd5e1;
+        border-radius: 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        color: #64748b;
+      }
+      .arrow-right {
+        width: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        font-size: 1.5rem;
+      }
+      .wins-list li::before {
+        content: "→ ";
+        color: #059669;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <!-- Header -->
+      <header class="space-y-4">
+        <h1 class="text-3xl font-serif font-bold text-slate-800">KHunter 架构审查</h1>
+        <p class="text-sm text-slate-500">2026-06-25 · 基于代码库当前状态</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600">
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-4 border-2 border-slate-400 bg-white rounded-sm inline-block"></span> 模块
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-0 border-t-2 border-dashed border-slate-400 inline-block"></span> 接缝
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-0 border-t-2 border-red-500 inline-block"></span> 泄漏
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-4 deep-box rounded-sm inline-block"></span> 深层模块
+          </span>
+        </div>
+      </header>
+
+      <!-- Candidates -->
+      <section id="candidates" class="space-y-10">
+
+        <!-- Candidate 1: BacktestEngine / StrategyRunner -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">1. 合并回测引擎与实盘运行器</h2>
+              <span class="badge-strong text-xs px-2 py-0.5 rounded-full font-medium">Strong</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>trading/backtest_engine.py</span>
+              <span>trading/strategy_runner.py</span>
+              <span>trading/stock_data_mixin.py</span>
+              <span>(新)</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <!-- Before/After Diagram -->
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 浅层模块，接口≈实现</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    subgraph BE["BacktestEngine (2508 行)"]
+        BE1["__init__: 注册表/获取器/缓存"]
+        BE2["_load_trading_calendar"]
+        BE3["_get_stock_price"]
+        BE4["_process_sell"]
+        BE5["_check_pool_removal"]
+        BE6["calculate_backtest_cost"]
+        BE7["_calculate_support_level"]
+    end
+    subgraph SR["StrategyRunner (4054 行)"]
+        SR1["__init__: 注册表/获取器/缓存"]
+        SR2["_load_trading_calendar"]
+        SR3["_get_stock_price"]
+        SR4["_process_sell"]
+        SR5["_check_pool_removal"]
+        SR6["calculate_trading_cost"]
+        SR7["_calculate_support_level"]
+    end
+    BE -.leak.->|"漂移的实现"| SR
+    classDef leak stroke:#dc2626,stroke-width:2px;
+    class BE,SR leak
+                  </pre>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 深层模块，共享实现</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    subgraph MIXIN["TradingCoreMixin (深层模块)"]
+        M1["交易日历管理"]
+        M2["股价查询"]
+        M3["卖出处理"]
+        M4["池移除检查"]
+        M5["交易成本计算"]
+        M6["支撑位计算"]
+    end
+    BE2["BacktestEngine\n(回测特有逻辑)"] --> MIXIN
+    SR2["StrategyRunner\n(实盘特有逻辑)"] --> MIXIN
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class MIXIN deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <!-- Problem / Solution / Wins -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>两个模块共享 7 个相同职责（交易日历、股价、卖出、池移除、成本、支撑位），但实现已漂移——参数名、默认值、日志各不相同。每次 bug 修复必须做两遍。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>提取 <code>TradingCoreMixin</code>，包含所有共享逻辑。BacktestEngine 和 StrategyRunner 各自只保留特有部分（回测循环 vs 实盘持久化/除权除息）。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>locality：bug 修复集中在一处</li>
+                  <li>leverage：一个接口，两个调用方</li>
+                  <li>删除 ~2000 行重复代码</li>
+                  <li>测试只需覆盖一个模块</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 2: web_server.py God Object -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">2. 拆分 web_server.py 上帝模块</h2>
+              <span class="badge-strong text-xs px-2 py-0.5 rounded-full font-medium">Strong</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>web_server.py</span>
+              <span>web/app_factory.py</span> <span>(新)</span>
+              <span>web/routes/dashboard.py</span> <span>(新)</span>
+              <span>web/routes/stocks.py</span> <span>(新)</span>
+              <span>web/routes/signals.py</span> <span>(新)</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 单文件，导入即副作用</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    WS["web_server.py (4442 行)"]
+    WS --> A["Flask 配置 + JSON 编码"]
+    WS --> B["模块级初始化\n(db/registry/fetcher/analyzer)"]
+    WS --> C["50+ 路由处理器"]
+    WS --> D["WebSocket 事件"]
+    WS --> E["业务逻辑编排"]
+    B -.leak.->|"导入即执行"| C
+    classDef leak stroke:#dc2626,stroke-width:2px;
+    class B leak
+                  </pre>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 工厂模式 + Blueprint 拆分</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    AF["app_factory.py\ncreate_app()"]
+    AF --> DB["初始化依赖\n(延迟注入)"]
+    AF --> R1["dashboard_bp"]
+    AF --> R2["stocks_bp"]
+    AF --> R3["signals_bp"]
+    AF --> R4["trading_bp"]
+    AF --> WS["WebSocket 事件"]
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class AF deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>导入 web_server 即触发数据库初始化和策略加载。50+ 路由、WebSocket、业务逻辑全在一个 4442 行文件中，无法单独测试任何端点。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>引入 <code>create_app()</code> 工厂函数，依赖通过参数注入。按领域拆分 Blueprint 到独立文件。模块级初始化移入工厂。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>leverage：工厂注入，测试可替换依赖</li>
+                  <li>locality：每个 Blueprint 自包含</li>
+                  <li>消除导入副作用</li>
+                  <li>可独立启动子集路由</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 3: Technical Indicators -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">3. 统一技术指标模块</h2>
+              <span class="badge-strong text-xs px-2 py-0.5 rounded-full font-medium">Strong</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>utils/technical.py</span>
+              <span>trading/technical_indicators.py</span>
+              <span>utils/support_level_calculator.py</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 三处计算 MA，三种假设</p>
+                <!-- Hand-built cross-section -->
+                <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-1">
+                  <div class="cross-section-band bg-blue-50 border-blue-400">
+                    <span class="font-medium">utils/technical.py</span>
+                    <span class="ml-2 text-slate-500">MA() — 反转数据处理降序</span>
+                  </div>
+                  <div class="cross-section-band bg-amber-50 border-amber-400">
+                    <span class="font-medium">trading/technical_indicators.py</span>
+                    <span class="ml-2 text-slate-500">calculate_ma() — 标准 rolling，带缓存</span>
+                  </div>
+                  <div class="cross-section-band bg-rose-50 border-rose-400">
+                    <span class="font-medium">utils/support_level_calculator.py</span>
+                    <span class="ml-2 text-slate-500">内联 rolling() — 假设升序</span>
+                  </div>
+                  <div class="mt-3 text-xs text-red-600 font-medium">
+                    ⚠ 数据排序假设不一致 → 潜在 bug
+                  </div>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 一个深层模块</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    subgraph TI["indicators/ (深层模块)"]
+        TI1["MA / EMA / ATR / RSI\n统一实现 + 排序处理"]
+        TI2["缓存层 (可选)"]
+        TI3["支撑位计算"]
+    end
+    S["策略"] --> TI
+    BE["回测引擎"] --> TI
+    SR["实盘运行器"] --> TI
+    KH["KHunter 狩猎场"] --> TI
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class TI deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>三个模块各自计算移动平均线，对数据排序的假设不同。开发者理解"MA 怎么算"需要检查三个位置。utils/technical.py 被策略使用却放在 utils/ 而非 strategy/。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>创建 <code>indicators/</code> 模块，统一所有技术指标实现。内部处理升序/降序转换，对外暴露统一接口。缓存作为内部实现细节。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>locality：指标逻辑集中一处</li>
+                  <li>消除排序假设不一致的 bug 风险</li>
+                  <li>leverage：一个接口覆盖所有调用方</li>
+                  <li>测试只需覆盖一个模块</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 4: StrategyRunner Monolith -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">4. 拆分 StrategyRunner 六大职责</h2>
+              <span class="badge-worth text-xs px-2 py-0.5 rounded-full font-medium">Worth exploring</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>trading/strategy_runner.py</span>
+              <span>trading/portfolio_manager.py</span> <span>(新)</span>
+              <span>trading/signal_store.py</span> <span>(新)</span>
+              <span>trading/exdividend_handler.py</span> <span>(新)</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 一个 4054 行的类</p>
+                <!-- Hand-built mass diagram -->
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <div class="mass-interface h-10 mb-1">
+                    接口：60+ 公共方法
+                  </div>
+                  <div class="mass-impl h-52">
+                    <div class="text-center space-y-1">
+                      <div>策略执行</div>
+                      <div>组合管理</div>
+                      <div>信号管理</div>
+                      <div>除权除息</div>
+                      <div>文件 I/O</div>
+                      <div>任务历史</div>
+                    </div>
+                  </div>
+                  <div class="mt-2 text-xs text-center text-slate-400">接口 ≈ 实现 → 浅层模块</div>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 职责分离</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    SR["StrategyRunner\n(编排器)"]
+    SR --> PM["PortfolioManager\n持仓/买卖"]
+    SR --> SS["SignalStore\n信号持久化"]
+    SR --> ED["ExdividendHandler\n除权除息"]
+    SR --> TH["TaskHistory\n任务记录"]
+    SR --> SE["StrategyExecutor\n选股+评分"]
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class SR deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>除权除息逻辑（240 行）嵌入在 StrategyRunner 深处，无法独立测试。组合管理、信号持久化、文件 I/O 交织在一起，修改一处可能影响其他。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>StrategyRunner 变为薄编排器，委托给 5 个专用模块。每个模块有自己的接口和状态，通过构造函数注入共享依赖。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>locality：除权除息逻辑自包含</li>
+                  <li>每个模块可独立测试</li>
+                  <li>接口从 60+ 方法缩减到 ~10</li>
+                  <li>修改组合逻辑不影响信号逻辑</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 5: Data Fetching Layer -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">5. 整合数据获取层</h2>
+              <span class="badge-worth text-xs px-2 py-0.5 rounded-full font-medium">Worth exploring</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>utils/akshare_fetcher.py</span>
+              <span>utils/base_fetcher.py</span>
+              <span>utils/data_fetcher.py</span>
+              <span>stock_analyzer/data_fetcher.py</span>
+              <span>+ 10 个子 fetcher</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 14+ 类，继承层次混乱</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    AKF["AKShareFetcher\n(门面，纯委托)"]
+    AKF --> SDF["StockDataFetcher"]
+    AKF --> KF["KlineFetcher"]
+    AKF --> FFF["FundFlowFetcher"]
+    AKF --> IDF["IndexDataFetcher"]
+    DF["DataFetcher\n(utils/data_fetcher.py)\n多源回退"] -.->|"同名不同类"| SDF2["DataFetcher\n(stock_analyzer/)\n直接 akshare"]
+    BF["base_fetcher.py\nDataFetcher 基类"] -.->|"部分继承"| FFF
+    classDef leak stroke:#dc2626,stroke-width:2px;
+    class DF,SDF2 leak
+                  </pre>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 统一接口 + 领域分组</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    subgraph DATA["data/ (深层模块)"]
+        DI["DataPort\n(统一接口)"]
+        DI --> MK["MarketData\n(行情/K线)"]
+        DI --> FF["FundFlow\n(资金流)"]
+        DI --> AN["Analysis\n(分析数据)"]
+    end
+    SR["StrategyRunner"] --> DI
+    BE["BacktestEngine"] --> DI
+    SA["StockAnalyzer"] --> DI
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class DATA,DI deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>两个同名 <code>DataFetcher</code> 类完全不同。AKShareFetcher 是纯委托门面，不增加逻辑。基类只被 5/14 个 fetcher 继承。stock_analyzer 有独立的数据获取路径。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>定义 <code>DataPort</code> 接口（统一数据访问），按领域分组实现。消除 AKShareFetcher 纯委托层。stock_analyzer 复用同一数据源。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>消除同名类歧义</li>
+                  <li>leverage：一个接口覆盖所有数据需求</li>
+                  <li>删除纯委托门面</li>
+                  <li>测试可用内存适配器替换</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 6: DBManager -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">6. 深化 DBManager — 分离通用与领域逻辑</h2>
+              <span class="badge-worth text-xs px-2 py-0.5 rounded-full font-medium">Worth exploring</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>utils/db_manager.py</span>
+              <span>utils/global_db.py</span>
+              <span>data/stock_repo.py</span> <span>(新)</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 浅层：接口 ≈ 实现</p>
+                <!-- Mass diagram -->
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <div class="mass-interface h-16 mb-1">
+                    接口：connect / execute / insert / update / delete / query<br>
+                    + read_stock / write_stock / list_all_stocks / get_stock_name ...
+                  </div>
+                  <div class="mass-impl h-32">
+                    <div class="text-center space-y-1">
+                      <div>SQLite 连接池</div>
+                      <div>事务管理</div>
+                      <div>stock_kline SQL</div>
+                      <div>stock_basic SQL</div>
+                    </div>
+                  </div>
+                  <div class="mt-2 text-xs text-center text-slate-400">两层职责混在一个接口中</div>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 深层：窄接口，厚实现</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    SR["StockRepo\n(深层: read/write/list)"]
+    SR --> DB["DBManager\n(薄: connect/execute)"]
+    DB --> SQL["SQLite"]
+    SR2["其他 Repo\n(未来扩展)"] --> DB
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class SR deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>DBManager 混合了通用 SQLite 操作和股票领域查询。47+ 处调用 <code>get_global_db()</code> 直接使用领域方法，接口宽泛。单例在导入时创建，无法测试替换。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>DBManager 只保留通用数据库操作。股票相关查询提取到 <code>StockRepo</code>，通过构造函数注入 DBManager。单例改为延迟初始化。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>DBManager 接口从 ~30 方法缩减到 ~10</li>
+                  <li>StockRepo 可用内存 DB 测试</li>
+                  <li>locality：股票 SQL 集中一处</li>
+                  <li>未来可扩展其他 Repo</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 7: trading/routes.py -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">7. 拆分 trading/routes.py 路由模块</h2>
+              <span class="badge-worth text-xs px-2 py-0.5 rounded-full font-medium">Worth exploring</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>trading/routes.py</span>
+              <span>trading/routes/backtest.py</span> <span>(新)</span>
+              <span>trading/routes/khunter.py</span> <span>(新)</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 两个 Blueprint 共享初始化</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    R["routes.py (2775 行)"]
+    R --> INIT["模块级初始化\nbacktest_dao\ndb_manager\nakshare_fetcher"]
+    R --> TB["trading_bp\n回测/执行计划"]
+    R --> KB["khunter_bp\n狩猎场"]
+    INIT -.leak.->|"导入即加载"| TB
+    INIT -.leak.->|"导入即加载"| KB
+    classDef leak stroke:#dc2626,stroke-width:2px;
+    class INIT leak
+                  </pre>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 独立 Blueprint，延迟初始化</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    AF["app_factory\nregister_blueprints()"]
+    AF --> BT["routes/backtest.py\ntrading_bp"]
+    AF --> KH["routes/khunter.py\nkhunter_bp"]
+    BT --> DI["依赖注入\n(app.config)"]
+    KH --> DI
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class AF deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>回测和狩猎场是不同领域，却共享模块级初始化。修改狩猎场路由必须加载回测 DAO 和 AKShareFetcher。无法单独测试任一 Blueprint。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>拆分为独立文件，依赖通过 Flask app.config 或工厂函数注入。与候选 #2（web_server 拆分）协同实施。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>消除跨领域导入耦合</li>
+                  <li>每个 Blueprint 可独立测试</li>
+                  <li>与 web_server 拆分协同</li>
+                  <li>locality：路由与领域逻辑就近</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 8: StrategyRegistry Hot-Reload -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">8. 优化 StrategyRegistry 热加载机制</h2>
+              <span class="badge-speculative text-xs px-2 py-0.5 rounded-full font-medium">Speculative</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>strategy/strategy_registry.py</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 每次访问重新实例化</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+sequenceDiagram
+    participant C as 调用方
+    participant R as StrategyRegistry
+    participant FS as 文件系统
+    C->>R: get_strategy("MA")
+    R->>FS: 读取 strategy_params.yaml
+    FS-->>R: YAML 内容
+    R->>R: 创建新实例 + 复制元数据
+    R-->>C: 策略实例 (临时)
+    Note over C,R: 下次调用重复整个流程
+                  </pre>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 文件变更检测 + 缓存</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+sequenceDiagram
+    participant C as 调用方
+    participant R as StrategyRegistry
+    participant FS as 文件系统
+    C->>R: get_strategy("MA")
+    R->>R: 检查缓存 + mtime
+    alt 文件未变
+        R-->>C: 缓存实例
+    else 文件已变
+        R->>FS: 读取 YAML
+        R->>R: 重建实例
+        R-->>C: 新实例
+    end
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>每次 <code>get_strategy()</code> 都读取 YAML 文件并重新实例化。策略对象是临时的，设置的状态会丢失。难以测试。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>使用文件 mtime 检测变更，未变则返回缓存实例。提供 <code>force_reload()</code> 方法。测试时可注入不读文件的适配器。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>减少磁盘 I/O</li>
+                  <li>策略实例可保持状态</li>
+                  <li>测试可跳过文件系统</li>
+                  <li>保留热加载能力</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 9: stock_analyzer -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">9. 统一 stock_analyzer 与 trading 的数据/评分</h2>
+              <span class="badge-speculative text-xs px-2 py-0.5 rounded-full font-medium">Speculative</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>stock_analyzer/__init__.py</span>
+              <span>stock_analyzer/data_fetcher.py</span>
+              <span>stock_analyzer/technical_analyzer.py</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 独立数据路径 + 重复评分</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    SA["StockAnalyzer"]
+    SA --> SADF["stock_analyzer/DataFetcher\n(独立 akshare 调用)"]
+    SA --> SAT["technical_analyzer\n(独立评分逻辑)"]
+    SA --> CONV["_convert_technical_result\n(格式转换层)"]
+    TR["trading/ 评分系统\n5 维评分"] -.->|"概念重复"| SAT
+    classDef leak stroke:#dc2626,stroke-width:2px;
+    class SAT,SADF leak
+                  </pre>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 共享数据源 + 适配层</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    SA["StockAnalyzer"]
+    SA --> DP["DataPort\n(共享数据接口)"]
+    SA --> SC["ScoringAdapter\n(复用 5 维评分)"]
+    DP --> AK["akshare"]
+    TR["trading/ 评分系统"] --> SC
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class DP,SC deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>stock_analyzer 有独立的数据获取和评分逻辑，与 trading/ 的 5 维评分系统概念重复。<code>_convert_technical_result()</code> 是因为两边格式不统一才存在的翻译层。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>依赖候选 #5（统一数据获取）和候选 #3（统一技术指标）。stock_analyzer 改为复用 trading/ 的评分系统，通过适配层转换输出格式。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>消除翻译层</li>
+                  <li>评分逻辑不再重复</li>
+                  <li>leverage：复用已有评分模块</li>
+                  <li>依赖候选 #5, #3 先行完成</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 10: CSVManager -->
+        <article class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-6 py-5 border-b border-slate-100">
+            <div class="flex items-center gap-3 mb-2">
+              <h2 class="text-xl font-serif font-bold">10. 移除 CSVManager 遗留模块</h2>
+              <span class="badge-speculative text-xs px-2 py-0.5 rounded-full font-medium">Speculative</span>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-mono text-slate-500">
+              <span>utils/csv_manager.py</span>
+              <span>main.py</span>
+              <span>strategy/b1_pattern_library.py</span>
+            </div>
+          </div>
+          <div class="px-6 py-5 space-y-5">
+            <div class="diagram-container">
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">Before — 双存储后端</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    M["main.py"] --> CSV["CSVManager\n(CSV 文件)"]
+    M --> DB["DBManager\n(SQLite)"]
+    B1["B1PatternLibrary"] --> CSV
+    STR["其他策略"] --> DB
+    CSV -.->|"可能返回不同数据"| DB
+    classDef leak stroke:#dc2626,stroke-width:2px;
+    class CSV leak
+                  </pre>
+                </div>
+              </div>
+              <div class="diagram-side">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3 font-medium">After — 单一存储后端</p>
+                <div class="rounded-lg border border-slate-200 bg-white p-4">
+                  <pre class="mermaid">
+flowchart TB
+    M["main.py"] --> DB["DBManager\n(SQLite)"]
+    B1["B1PatternLibrary"] --> DB
+    STR["其他策略"] --> DB
+    classDef deep fill:#0f172a,stroke:#334155,color:#e2e8f0
+    class DB deep
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <h3 class="font-medium text-red-700 mb-1">问题</h3>
+                <p>CSVManager 是从 CSV 迁移到 SQLite 后的遗留代码。B1PatternLibrary 仍通过它读取数据，而其他所有模块使用 DBManager。两个后端可能返回不同数据。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-emerald-700 mb-1">方案</h3>
+                <p>B1PatternLibrary 改用 DBManager 的 <code>read_stock()</code>。删除 CSVManager 及其在 main.py 中的实例化。确保 B1 的数据源与其他模块一致。</p>
+              </div>
+              <div>
+                <h3 class="font-medium text-slate-700 mb-1">收益</h3>
+                <ul class="wins-list space-y-1 text-slate-600">
+                  <li>消除双存储后端歧义</li>
+                  <li>删除 80 行遗留代码</li>
+                  <li>B1 数据与其他策略一致</li>
+                  <li>接口统一，无隐式依赖</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- Top Recommendation -->
+      <section id="top-recommendation" class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-8 text-white">
+        <h2 class="text-2xl font-serif font-bold mb-4">首选推荐</h2>
+        <div class="space-y-4">
+          <div class="bg-white/10 rounded-lg p-5">
+            <h3 class="text-lg font-bold text-emerald-300 mb-2">
+              <a href="#" class="hover:underline">#1 合并回测引擎与实盘运行器</a>
+            </h3>
+            <p class="text-slate-300 text-sm leading-relaxed">
+              这是代码库中最大的维护负担——~6500 行近重复代码，每次 bug 修复必须做两遍。
+              提取 <code class="text-emerald-200">TradingCoreMixin</code> 可立即消除 ~2000 行重复，
+              使回测和实盘共享同一套交易逻辑。这是 leverage 最高的改动：一个模块，两个调用方，
+              所有测试集中覆盖。与候选 #3（统一技术指标）和候选 #6（深化 DBManager）协同实施效果最佳。
+            </p>
+          </div>
+          <p class="text-xs text-slate-400">
+            建议执行顺序：#10 (CSVManager) → #3 (技术指标) → #1 (引擎合并) → #6 (DBManager) → #2 (web_server) → #4 (StrategyRunner 拆分)
+          </p>
+        </div>
+      </section>
+
+    </main>
+  </body>
+</html>
