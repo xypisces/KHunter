@@ -1206,13 +1206,9 @@ def run_selection():
         if b1_match:
             func_logger.info(f"启用B1完美图形匹配，最小相似度: {min_similarity}，回看天数: {lookback_days}")
             try:
-                # 初始化CSV管理器
-                from utils.csv_manager import CSVManager
-                csv_manager = CSVManager('data')
-                
                 # 初始化B1完美图形库
                 from strategy.pattern_library import B1PatternLibrary
-                library = B1PatternLibrary(csv_manager)
+                library = B1PatternLibrary()
                 
                 # 执行B1完美图形匹配
                 matched_results = []
@@ -1237,7 +1233,7 @@ def run_selection():
                     name = stock['name']
                     
                     # 读取股票数据
-                    df = csv_manager.read_stock(code)
+                    df = db_manager.read_stock(code)
                     if df.empty:
                         continue
                     

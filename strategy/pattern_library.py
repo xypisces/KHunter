@@ -23,10 +23,11 @@ class B1PatternLibrary:
     - 为B2、B3等扩展预留空间
     """
     
-    CACHE_FILE = Path("/root/quant-csv/data/b1_pattern_library_cache.json")
-    
-    def __init__(self, csv_manager):
-        self.csv_manager = csv_manager
+    CACHE_FILE = Path("data/cache/b1_pattern_library_cache.json")
+
+    def __init__(self):
+        from utils.global_db import get_global_db
+        self.db = get_global_db()
         self.extractor = PatternFeatureExtractor()
         self.matcher = PatternMatcher(SIMILARITY_WEIGHTS)
         self.cases = {}  # {case_id: {meta, features}}
@@ -41,7 +42,7 @@ class B1PatternLibrary:
         
         for case in B1_PERFECT_CASES:
             try:
-                df = self.csv_manager.read_stock(case["code"])
+                df = self.db.read_stock(case["code"])
                 
                 if df.empty:
                     print(f"  ⚠️ 跳过 {case['name']}({case['code']}): 无数据")
@@ -178,7 +179,7 @@ class B1PatternLibrary:
         """动态添加新案例"""
         try:
             # 重新计算该案例特征
-            df = self.csv_manager.read_stock(case_config["code"])
+            df = self.db.read_stock(case_config["code"])
             window_df = self._extract_window(
                 df, 
                 case_config["breakout_date"], 

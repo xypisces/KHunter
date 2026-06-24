@@ -119,7 +119,7 @@ class DataFetcher:
         
         try:
             # 1. 优先从本地读取数据
-            local_df = self.csv_manager.read_stock(stock_code)
+            local_df = self.db_manager.read_stock(stock_code)
             if not local_df.empty:
                 print(f"从本地获取 {stock_code} 历史数据: {len(local_df)} 条")
                 
@@ -193,7 +193,7 @@ class DataFetcher:
                 data = data.sort_values('date')
                 
                 # 保存到本地
-                self.csv_manager.update_stock(stock_code, data)
+                self.db_manager.update_stock(stock_code, data)
                 print(f"已保存 {stock_code} 历史数据到本地")
             
             return data

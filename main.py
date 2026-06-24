@@ -57,9 +57,6 @@ class QuantSystem:
         self.db_manager = get_global_db()
         self.fetcher = AKShareFetcher(self.data_dir)
         self.registry = get_registry("config/strategy_params.yaml")
-        # 初始化CSV管理器
-        from utils.csv_manager import CSVManager
-        self.csv_manager = CSVManager(self.data_dir)
     
     def _load_config(self, config_file):
         """加载配置文件"""
@@ -415,7 +412,7 @@ class QuantSystem:
             from strategy.pattern_library import B1PatternLibrary
             from strategy.pattern_config import MIN_SIMILARITY_SCORE
             
-            library = B1PatternLibrary(self.csv_manager)
+            library = B1PatternLibrary()
             
             if not library.cases:
                 print("⚠️ 警告: 案例库为空，可能数据不足")

@@ -73,7 +73,8 @@ akshare API → utils/数据获取 → SQLite (data/stock_selection.db)
 
 - 主数据库：`data/stock_selection.db`（SQLite）
 - 全局访问：`utils/global_db.py` 的 `get_global_db()` 获取 `DBManager` 单例
-- DBManager 提供线程安全的连接池和事务管理
+- DBManager 是唯一的数据库后端（CSV 后端已移除），提供线程安全的连接池和事务管理
+- B1 图形库缓存：`data/cache/b1_pattern_library_cache.json`
 
 ### Web 前端
 

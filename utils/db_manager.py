@@ -692,12 +692,11 @@ class DBManager:
             logger.error(f"数据库分析失败: {str(e)}")
             raise
     
-    # ==================== CSV 替代方法 ====================
-    # 以下方法用于替代 CSVManager，提供相同的接口
-    
+    # ==================== 股票K线数据方法 ====================
+
     def read_stock(self, stock_code: str, start_date: str = None, end_date: str = None, limit: int = None, order: str = 'desc') -> 'pd.DataFrame':
         """
-        读取股票K线数据（替代 CSVManager.read_stock）
+        读取股票K线数据
 
         Args:
             stock_code: 股票代码，例如000001
@@ -760,7 +759,7 @@ class DBManager:
     
     def write_stock(self, stock_code: str, df: 'pd.DataFrame') -> bool:
         """
-        写入股票K线数据（替代 CSVManager.write_stock）
+        写入股票K线数据
         
         Args:
             stock_code: 股票代码
@@ -818,7 +817,7 @@ class DBManager:
     
     def update_stock(self, stock_code: str, new_df: 'pd.DataFrame') -> bool:
         """
-        增量更新股票数据（替代 CSVManager.update_stock）
+        增量更新股票数据
         
         Args:
             stock_code: 股票代码
@@ -851,7 +850,7 @@ class DBManager:
     
     def list_all_stocks(self) -> List[str]:
         """
-        列出所有已保存的股票代码（替代 CSVManager.list_all_stocks）
+        列出所有已保存的股票代码
         
         Returns:
             List[str]: 股票代码列表，已排序
@@ -870,7 +869,7 @@ class DBManager:
     
     def stock_exists(self, stock_code: str) -> bool:
         """
-        检查股票数据是否存在（替代 CSVManager.stock_exists）
+        检查股票数据是否存在
         
         Args:
             stock_code: 股票代码
@@ -892,7 +891,7 @@ class DBManager:
     
     def get_stock_count(self) -> int:
         """
-        获取已保存的股票数量（替代 CSVManager.get_stock_count）
+        获取已保存的股票数量
         
         Returns:
             int: 股票数量
