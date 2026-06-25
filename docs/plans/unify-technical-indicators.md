@@ -1,6 +1,6 @@
 # 统一技术指标模块 PRD
 
-> **状态**: 待实施 | **优先级**: Strong | **创建日期**: 2026-06-25
+> **状态**: 已完成 | **优先级**: Strong | **创建日期**: 2026-06-25
 
 ---
 
@@ -181,16 +181,16 @@ def MA(series, n):
 
 ## 验收标准
 
-- [ ] 所有 MA/EMA/ATR/RSI/KDJ/MACD/Bollinger 计算在 `indicators/` 模块中
-- [ ] 内部处理升序/降序转换，每个函数自包含
-- [ ] 对外暴露统一纯函数接口
-- [ ] RSI 统一为 EWM 算法
-- [ ] KDJ 统一为滚动+循环算法
-- [ ] ATR 使用标准公式
-- [ ] 8+ 处调用方全部迁移到新接口
-- [ ] 单元测试覆盖所有指标（正确性 + 回归 + 排序一致性 + 集成）
-- [ ] CachedIndicators 提供可选缓存层
-- [ ] 旧模块标记废弃并保留 deprecation warning
+- [x] 所有 MA/EMA/ATR/RSI/KDJ/MACD/Bollinger 计算在 `indicators/` 模块中
+- [x] 内部处理升序/降序转换，每个函数自包含
+- [x] 对外暴露统一纯函数接口
+- [x] RSI 统一为 EWM 算法
+- [x] KDJ 统一为滚动+循环算法
+- [x] ATR 使用标准公式
+- [x] 8+ 处调用方全部迁移到新接口
+- [x] 单元测试覆盖所有指标（正确性 + 回归 + 排序一致性 + 集成）
+- [x] CachedIndicators 提供可选缓存层
+- [x] 旧模块标记废弃并保留 deprecation warning
 
 ---
 

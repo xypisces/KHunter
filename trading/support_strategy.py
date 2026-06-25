@@ -6,6 +6,8 @@ import pandas as pd
 from trading.timing_strategies import TimingStrategy, TimingResult
 from typing import Dict, Optional
 
+from indicators import ma
+
 
 class SupportStrategy(TimingStrategy):
     """支撑位策略"""
@@ -41,7 +43,7 @@ class SupportStrategy(TimingStrategy):
             result = result.iloc[::-1].reset_index(drop=True)
         
         # 计算MA20
-        result['ma20'] = result['close'].rolling(window=20).mean()
+        result['ma20'] = ma(result['close'], 20)
         
         return result
     
@@ -137,7 +139,7 @@ class SupportStrategy(TimingStrategy):
         if self.method == 'ma20':
             # 20日均线支撑位
             if len(df) >= 20:
-                return df['close'].rolling(window=20).mean().iloc[-1]
+                return ma(df['close'], 20).iloc[-1]
         
         elif self.method == 'key_close_5':
             # 关键日收盘价下5%
@@ -164,6 +166,6 @@ class SupportStrategy(TimingStrategy):
         
         # fallback: 使用20日均线
         if len(df) >= 20:
-            return df['close'].rolling(window=20).mean().iloc[-1]
+            return ma(df['close'], 20).iloc[-1]
         
         return 0.0

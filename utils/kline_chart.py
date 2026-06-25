@@ -12,6 +12,8 @@ from pathlib import Path
 import sys
 import os
 
+from indicators import ma, ema
+
 # 设置中文字体
 plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'Arial Unicode MS', 'WenQuanYi Micro Hei']
 plt.rcParams['axes.unicode_minus'] = False
@@ -124,14 +126,13 @@ def generate_kline_chart(
         # 检查是否已有趋势线数据（策略已计算过）
         if 'short_term_trend' not in df.columns or 'bull_bear_line' not in df.columns:
             # 短期趋势线 = EMA(EMA(CLOSE,10),10)
-            ema10 = df['close'].ewm(span=10, adjust=False, min_periods=1).mean()
-            df['short_term_trend'] = ema10.ewm(span=10, adjust=False, min_periods=1).mean()
-            
+            df['short_term_trend'] = ema(ema(df['close'], 10), 10)
+
             # 多空线 = (MA14 + MA28 + MA57 + MA114) / 4
-            ma14 = df['close'].rolling(window=14, min_periods=1).mean()
-            ma28 = df['close'].rolling(window=28, min_periods=1).mean()
-            ma57 = df['close'].rolling(window=57, min_periods=1).mean()
-            ma114 = df['close'].rolling(window=114, min_periods=1).mean()
+            ma14 = ma(df['close'], 14)
+            ma28 = ma(df['close'], 28)
+            ma57 = ma(df['close'], 57)
+            ma114 = ma(df['close'], 114)
             df['bull_bear_line'] = (ma14 + ma28 + ma57 + ma114) / 4
         
         # 只显示最近M天（默认20天），但用全部数据计算了双线

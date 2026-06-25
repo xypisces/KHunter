@@ -8,6 +8,8 @@ import numpy as np
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 
+from indicators import ma, ema, rsi, kdj, macd, bollinger
+
 
 class TechnicalAnalyzer:
     """技术分析器"""
@@ -18,130 +20,105 @@ class TechnicalAnalyzer:
     
     def calculate_ma(self, data: pd.DataFrame, periods: List[int]) -> pd.DataFrame:
         """计算移动平均线
-        
+
         Args:
             data: 历史行情数据
             periods: 移动平均线周期列表
-            
+
         Returns:
             pd.DataFrame: 添加了移动平均线的数据集
         """
         if data is None or data.empty:
             return data
-        
+
         for period in periods:
-            data[f'ma{period}'] = data['close'].rolling(window=period).mean()
+            data[f'ma{period}'] = ma(data['close'], period)
         return data
     
     def calculate_macd(self, data: pd.DataFrame, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9) -> pd.DataFrame:
         """计算MACD指标
-        
+
         Args:
             data: 历史行情数据
             fast_period: 快速移动平均线周期
             slow_period: 慢速移动平均线周期
             signal_period: 信号线周期
-            
+
         Returns:
             pd.DataFrame: 添加了MACD指标的数据集
         """
         if data is None or data.empty:
             return data
-        
-        # 计算快速和慢速移动平均线
-        data['ema12'] = data['close'].ewm(span=fast_period, adjust=False).mean()
-        data['ema26'] = data['close'].ewm(span=slow_period, adjust=False).mean()
-        
-        # 计算MACD线
-        data['macd'] = data['ema12'] - data['ema26']
-        
-        # 计算信号线
-        data['signal'] = data['macd'].ewm(span=signal_period, adjust=False).mean()
-        
-        # 计算柱状图
-        data['hist'] = data['macd'] - data['signal']
-        
+
+        # 计算MACD
+        dif, dea, hist = macd(data, fast_period, slow_period, signal_period)
+        data['macd'] = dif
+        data['signal'] = dea
+        data['hist'] = hist
+
         return data
     
     def calculate_rsi(self, data: pd.DataFrame, period: int = 14) -> pd.DataFrame:
         """计算RSI指标
-        
+
         Args:
             data: 历史行情数据
             period: RSI周期
-            
+
         Returns:
             pd.DataFrame: 添加了RSI指标的数据集
         """
         if data is None or data.empty:
             return data
-        
-        # 计算价格变化
-        delta = data['close'].diff()
-        
-        # 分离涨跌
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        
+
         # 计算RSI
-        rs = gain / loss
-        data['rsi'] = 100 - (100 / (1 + rs))
-        
+        data['rsi'] = rsi(data, period)
+
         return data
     
     def calculate_bollinger_bands(self, data: pd.DataFrame, period: int = 20, std_dev: float = 2) -> pd.DataFrame:
         """计算布林带
-        
+
         Args:
             data: 历史行情数据
             period: 移动平均线周期
             std_dev: 标准差倍数
-            
+
         Returns:
             pd.DataFrame: 添加了布林带的数据集
         """
         if data is None or data.empty:
             return data
-        
-        # 计算中轨
-        data['bb_mid'] = data['close'].rolling(window=period).mean()
-        
-        # 计算上轨和下轨
-        data['bb_std'] = data['close'].rolling(window=period).std()
-        data['bb_upper'] = data['bb_mid'] + (data['bb_std'] * std_dev)
-        data['bb_lower'] = data['bb_mid'] - (data['bb_std'] * std_dev)
-        
+
+        # 计算布林带
+        mid, upper, lower = bollinger(data, period, std_dev)
+        data['bb_mid'] = mid
+        data['bb_upper'] = upper
+        data['bb_lower'] = lower
+
         return data
     
     def calculate_kdj(self, data: pd.DataFrame, n: int = 9, m1: int = 3, m2: int = 3) -> pd.DataFrame:
         """计算KDJ指标
-        
+
         Args:
             data: 历史行情数据
             n: 周期
             m1: K值平滑周期
             m2: D值平滑周期
-            
+
         Returns:
             pd.DataFrame: 添加了KDJ指标的数据集
         """
         if data is None or data.empty:
             return data
-        
-        # 计算RSV
-        data['low_n'] = data['low'].rolling(window=n).min()
-        data['high_n'] = data['high'].rolling(window=n).max()
-        data['rsv'] = (data['close'] - data['low_n']) / (data['high_n'] - data['low_n']) * 100
-        
-        # 计算K值
-        data['k'] = data['rsv'].ewm(com=m1-1, adjust=False).mean()
-        
-        # 计算D值
-        data['d'] = data['k'].ewm(com=m2-1, adjust=False).mean()
-        
-        # 计算J值
-        data['j'] = 3 * data['k'] - 2 * data['d']
-        
+
+        # 计算KDJ
+        k, d, j = kdj(data, n, m1, m2)
+        data['k'] = k
+        data['d'] = d
+        data['j'] = j
+
         return data
     
     def analyze_trend(self, data: pd.DataFrame) -> Dict[str, Any]:

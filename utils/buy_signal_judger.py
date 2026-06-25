@@ -12,6 +12,8 @@ import pandas as pd
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple, Union
 
+from indicators import ma
+
 # 获取日志记录器
 logger = logging.getLogger(__name__)
 
@@ -100,9 +102,9 @@ class TrendBuySignalJudger(BaseBuySignalJudger):
         """
         try:
             ma_period = kwargs.get('ma_period', 20)
-            
+
             # 计算移动平均线
-            stock_data['ma'] = stock_data['close'].rolling(window=ma_period).mean()
+            stock_data['ma'] = ma(stock_data['close'], ma_period)
             
             # 判断趋势
             if len(stock_data) >= ma_period:

@@ -12,6 +12,8 @@ import pandas as pd
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple, Union
 
+from indicators import ma
+
 # 获取日志记录器
 logger = logging.getLogger(__name__)
 
@@ -36,31 +38,31 @@ class BaseSupportLevelCalculator(ABC):
 
 class MASupportLevelCalculator(BaseSupportLevelCalculator):
     """移动平均线支撑位计算"""
-    
+
     def calculate(self, stock_data: pd.DataFrame, **kwargs) -> float:
         """
         计算移动平均线支撑位
-        
+
         Args:
             stock_data: 股票K线数据
             **kwargs:
                 period: 移动平均线周期，默认20
-                
+
         Returns:
             支撑位价格
         """
         try:
             period = kwargs.get('period', 20)
-            
+
             # 计算移动平均线
-            stock_data['ma'] = stock_data['close'].rolling(window=period).mean()
-            
+            ma_series = ma(stock_data['close'], period)
+
             # 使用最新的移动平均线值作为支撑位
-            support_level = stock_data['ma'].iloc[-1]
-            
+            support_level = ma_series.iloc[-1]
+
             logger.debug(f"移动平均线支撑位计算完成: {support_level}")
             return support_level
-            
+
         except Exception as e:
             logger.error(f"移动平均线支撑位计算失败: {str(e)}")
             return 0.0

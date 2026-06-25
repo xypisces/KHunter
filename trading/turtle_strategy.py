@@ -6,6 +6,8 @@ import pandas as pd
 from trading.timing_strategies import TimingStrategy, TimingResult
 from typing import Dict, Optional
 
+from indicators import ma, hhv, llv, atr
+
 
 def same_row(df: pd.DataFrame, row: pd.Series) -> pd.Series:
     """判断DataFrame中与给定Series相同的行"""
@@ -105,20 +107,15 @@ class TurtleStrategy(TimingStrategy):
         # 因为买入信号是判断 signal_bar['high'] > signal_bar['up']
         # 所以 up 需要向右偏移1天，这样 signal_bar['up'] = T-1日及之前N-1天的最大值
         # 然后 T日 的 high 突破这个值时触发买入
-        result['up'] = result['high'].rolling(window=self.n1).max().shift(1)   # 入场上线（不含当天）
-        result['down'] = result['low'].rolling(window=self.n2).min().shift(1)  # 出场下线（不含当天，不直接用于买入判断）
+        result['up'] = hhv(result['high'], self.n1).shift(1)   # 入场上线（不含当天）
+        result['down'] = llv(result['low'], self.n2).shift(1)  # 出场下线（不含当天，不直接用于买入判断）
         
         # 计算ATR（标准三因子公式 + SMA）
         # 经典海龟使用简单移动平均（SMA），而非EWM
-        prev_close = result['close'].shift(1)
-        tr1 = result['high'] - result['low']
-        tr2 = (result['high'] - prev_close).abs()
-        tr3 = (result['low'] - prev_close).abs()
-        result['tr'] = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        result['atr'] = result['tr'].rolling(window=self.atr_period).mean()
+        result['atr'] = atr(result, self.atr_period)
         
         # 计算均线过滤（20日均线）
-        result['ma20'] = result['close'].rolling(window=20).mean()
+        result['ma20'] = ma(result['close'], 20)
         
         return result
     
@@ -374,6 +371,6 @@ class TurtleStrategy(TimingStrategy):
         
         # fallback: 使用20日均线
         if len(df) >= 20:
-            return df['close'].rolling(window=20).mean().iloc[-1]
+            return ma(df['close'], 20).iloc[-1]
         
         return 0.0

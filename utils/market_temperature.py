@@ -17,6 +17,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 import pandas as pd
 
+from indicators import ma
+
 logger = logging.getLogger(__name__)
 
 # 数据获取异常类
@@ -455,7 +457,7 @@ class MarketTemperature:
                 raise DataNotAvailableError(f"历史成交额数据不足，日期: {trade_date}")
             
             # 计算5日平均（包含今日）
-            ma5 = daily_volumes.rolling(5).mean().iloc[-1]
+            ma5 = ma(daily_volumes, 5).iloc[-1]
             
             return ma5
         except DataNotAvailableError:

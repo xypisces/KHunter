@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Any
 
+from indicators import ma
+
 # 配置日志
 logger = logging.getLogger(__name__)
 
@@ -139,8 +141,8 @@ class StockFilter:
                 return False
             
             df_reversed = df.iloc[::-1].copy()
-            df_reversed['MA'] = df_reversed['close'].rolling(window=days).mean()
-            latest_ma = df_reversed.iloc[-1]['MA']
+            ma_series = ma(df_reversed['close'], days)
+            latest_ma = ma_series.iloc[-1]
             current_price = df.iloc[0]['close']
             
             if latest_ma != 0:
@@ -369,8 +371,8 @@ class StockFilter:
                         
                         try:
                             df_reversed = df.iloc[::-1].copy()
-                            df_reversed['MA'] = df_reversed['close'].rolling(window=days).mean()
-                            latest_ma = df_reversed.iloc[-1]['MA']
+                            ma_series = ma(df_reversed['close'], days)
+                            latest_ma = ma_series.iloc[-1]
                             current_price = df.iloc[0]['close']
                             if latest_ma != 0:
                                 bias = (current_price - latest_ma) / latest_ma * 100
