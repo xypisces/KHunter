@@ -38,19 +38,27 @@ class NewStockDetector:
         stats: 统计信息 {'detected': int, 'initialized': int, 'failed': int}
     """
     
-    def __init__(self, db_manager, stock_data_fetcher, data_initializer):
+    def __init__(self, db_manager, stock_data_fetcher, data_initializer, stock_repo=None):
         """
         初始化新股票检测器
-        
+
         Args:
             db_manager: 数据库管理器实例
             stock_data_fetcher: 股票数据获取器实例
             data_initializer: 数据初始化器实例
+            stock_repo: 股票数据仓库实例（可选，默认从 db_manager 创建）
         """
         # 初始化依赖组件
         self.db_manager = db_manager
         self.stock_data_fetcher = stock_data_fetcher
         self.data_initializer = data_initializer
+
+        # 初始化股票数据仓库
+        if stock_repo is not None:
+            self.stock_repo = stock_repo
+        else:
+            from utils.stock_repo import StockRepo
+            self.stock_repo = StockRepo(db_manager)
         
         # 初始化统计信息
         self.stats = {
@@ -233,7 +241,7 @@ class NewStockDetector:
         """
         try:
             # 获取数据库中已有的股票代码
-            existing_stocks = set(self.db_manager.list_all_stocks())
+            existing_stocks = set(self.stock_repo.list_all_stocks())
             logger.debug(f"数据库中已有 {len(existing_stocks)} 只股票")
             
             # 获取最新股票代码集合

@@ -15,7 +15,7 @@ except ImportError:
     pd = None
 
 # 导入全局数据库管理器
-from utils.global_db import get_global_db
+from utils.global_db import get_global_db, get_stock_repo
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ class SelectionRecordManager:
         """
         # 使用全局数据库管理器实例
         self.db_manager = get_global_db()
+        self.stock_repo = get_stock_repo()
         self._init_db()
     
     def _init_db(self):
@@ -857,8 +858,8 @@ class SelectionRecordManager:
             import pytz
             
             # 从数据库读取股票数据
-            df = self.db_manager.read_stock(stock_code)
-            
+            df = self.stock_repo.read_stock(stock_code)
+
             # 获取实时价格
             current_price = self._get_current_price(stock_code, df)
             
@@ -1087,7 +1088,7 @@ class SelectionRecordManager:
         """
         try:
             # 从数据库读取股票数据
-            df = self.db_manager.read_stock(stock_code)
+            df = self.stock_repo.read_stock(stock_code)
             if df is None or df.empty:
                 return 0.0
             

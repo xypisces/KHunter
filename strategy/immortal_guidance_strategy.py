@@ -597,9 +597,8 @@ class ImmortalGuidanceStrategy(BaseStrategy):
         Returns:
             str: 最新交易日（YYYY-MM-DD格式）
         """
-        from utils.db_manager import DBManager
-        db = DBManager()
-        return db.get_latest_trading_date()
+        from utils.global_db import get_stock_repo
+        return get_stock_repo().get_latest_trading_date()
 
     def _truncate_to_date(self, df, cutoff_date) -> 'pd.DataFrame':
         """

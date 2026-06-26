@@ -30,15 +30,21 @@ logger = logging.getLogger(__name__)
 class VectorBTDataLoader:
     """向量化数据加载器"""
     
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, stock_repo=None):
         """
         初始化数据加载器
-        
+
         Args:
             db_manager: 数据库管理器实例
+            stock_repo: 股票数据仓库实例（可选，默认从 db_manager 创建）
         """
         # db_manager: 数据库管理器，类型DBManager，必填
         self.db_manager = db_manager
+        if stock_repo is not None:
+            self.stock_repo = stock_repo
+        else:
+            from utils.stock_repo import StockRepo
+            self.stock_repo = StockRepo(db_manager)
     
     def load_prices_matrix(self, stock_codes: List[str], start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -62,7 +68,7 @@ class VectorBTDataLoader:
         for code in stock_codes:
             try:
                 # 从数据库读取股票数据
-                df = self.db_manager.read_stock(code, end_date=end_date)
+                df = self.stock_repo.read_stock(code, end_date=end_date)
                 
                 # 过滤日期范围
                 if not df.empty:
@@ -298,16 +304,21 @@ class VectorBTBacktestExecutor:
 class VectorBTBacktestEngine:
     """VectorBT向量化回测引擎"""
     
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, stock_repo=None):
         """
         初始化回测引擎
-        
+
         Args:
             db_manager: 数据库管理器实例
+            stock_repo: 股票数据仓库实例（可选）
         """
         # db_manager: 数据库管理器，类型DBManager，必填
         self.db_manager = db_manager
-        self.data_loader = VectorBTDataLoader(db_manager)
+        if stock_repo is None:
+            from utils.stock_repo import StockRepo
+            stock_repo = StockRepo(db_manager)
+        self.stock_repo = stock_repo
+        self.data_loader = VectorBTDataLoader(db_manager, stock_repo)
         self.signal_generator = VectorBTSignalGenerator()
         self.backtest_executor = VectorBTBacktestExecutor()
     

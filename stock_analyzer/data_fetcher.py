@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Any
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.db_manager import DBManager
+from utils.global_db import get_stock_repo
 from utils.akshare_retry import akshare_call_with_retry
 
 
@@ -28,6 +29,7 @@ class DataFetcher:
         # 初始化数据库管理器
         from utils.global_db import get_global_db
         self.db_manager = get_global_db()
+        self.stock_repo = get_stock_repo()
         
         # 设置请求会话
         self.session = requests.Session()
@@ -119,7 +121,7 @@ class DataFetcher:
         
         try:
             # 1. 优先从本地读取数据
-            local_df = self.db_manager.read_stock(stock_code)
+            local_df = self.stock_repo.read_stock(stock_code)
             if not local_df.empty:
                 print(f"从本地获取 {stock_code} 历史数据: {len(local_df)} 条")
                 
@@ -193,7 +195,7 @@ class DataFetcher:
                 data = data.sort_values('date')
                 
                 # 保存到本地
-                self.db_manager.update_stock(stock_code, data)
+                self.stock_repo.update_stock(stock_code, data)
                 print(f"已保存 {stock_code} 历史数据到本地")
             
             return data

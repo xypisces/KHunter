@@ -96,8 +96,9 @@ class BacktestEngine:
         if args:
             db_path = args[0]
         
-        from utils.global_db import get_global_db
+        from utils.global_db import get_global_db, get_stock_repo
         self.db_manager = get_global_db()
+        self.stock_repo = get_stock_repo()
         self.akshare_fetcher = AKShareFetcher("data")
         self.strategy_registry = StrategyRegistry()
         # 初始化K线数据获取器
@@ -1041,15 +1042,10 @@ class BacktestEngine:
         # 优先从缓存获取
         if code in self.stock_name_cache:
             return self.stock_name_cache[code]
-        
+
         try:
-            cursor = self.db_manager.execute(
-                "SELECT name FROM stock_basic WHERE code = ?",
-                (code,)
-            )
-            row = cursor.fetchone()
-            if row and row[0]:
-                name = row[0]
+            name = self.stock_repo.get_stock_name(code)
+            if name and name != '未知':
                 self.stock_name_cache[code] = name
                 return name
         except Exception as e:
@@ -1636,15 +1632,15 @@ class BacktestEngine:
         logger.info(f"预加载股票数据: {extended_start} ~ {end_date} (原始: {start_date} ~ {end_date}, 加载历史: {required_days}天)")
         
         # 获取所有股票代码
-        stock_codes = self.db_manager.list_all_stocks()
+        stock_codes = self.stock_repo.list_all_stocks()
         total = len(stock_codes)
         loaded = 0
         skipped = 0
-        
+
         for i, code in enumerate(stock_codes):
             try:
                 # 读取股票数据
-                df = self.db_manager.read_stock(code)
+                df = self.stock_repo.read_stock(code)
                 
                 if df is None or (hasattr(df, 'empty') and df.empty) or len(df) < 60:
                     skipped += 1

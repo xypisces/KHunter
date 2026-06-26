@@ -26,8 +26,8 @@ class B1PatternLibrary:
     CACHE_FILE = Path("data/cache/b1_pattern_library_cache.json")
 
     def __init__(self):
-        from utils.global_db import get_global_db
-        self.db = get_global_db()
+        from utils.global_db import get_stock_repo
+        self.db = get_stock_repo()
         self.extractor = PatternFeatureExtractor()
         self.matcher = PatternMatcher(SIMILARITY_WEIGHTS)
         self.cases = {}  # {case_id: {meta, features}}

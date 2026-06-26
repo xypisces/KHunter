@@ -145,9 +145,9 @@ if __name__ == '__main__':
     print("测试简化版K线图生成...")
     
     # 初始化数据库管理器
-    from utils.global_db import get_global_db
-    db_manager = get_global_db()
-    df = db_manager.read_stock('000995')
+    from utils.global_db import get_stock_repo
+    stock_repo = get_stock_repo()
+    df = stock_repo.read_stock('000995')
     
     strategy = BowlReboundStrategy()
     df = strategy.calculate_indicators(df)

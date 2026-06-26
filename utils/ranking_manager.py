@@ -422,12 +422,12 @@ class RankingManager:
                 # 如果当前价格获取失败，返回0.0
                 return 0.0
             
-            # 使用全局数据库管理器实例
-            from utils.global_db import get_global_db
-            db_manager = get_global_db()
-            
+            # 使用全局股票数据仓库
+            from utils.global_db import get_stock_repo
+            stock_repo = get_stock_repo()
+
             # 从数据库读取股票数据
-            df = db_manager.read_stock(stock_code)
+            df = stock_repo.read_stock(stock_code)
             
             # 获取当前价格
             current_price = self.akshare_fetcher.get_stock_price(stock_code)

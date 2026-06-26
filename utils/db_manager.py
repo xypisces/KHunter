@@ -692,281 +692,65 @@ class DBManager:
             logger.error(f"数据库分析失败: {str(e)}")
             raise
     
-    # ==================== 股票K线数据方法 ====================
+    # ==================== 股票K线数据方法（已废弃，请使用 StockRepo） ====================
+
+    def _get_stock_repo(self):
+        """获取 StockRepo 实例（延迟导入避免循环依赖）"""
+        from utils.stock_repo import StockRepo
+        if not hasattr(self, '_stock_repo_instance'):
+            self._stock_repo_instance = StockRepo(self)
+        return self._stock_repo_instance
 
     def read_stock(self, stock_code: str, start_date: str = None, end_date: str = None, limit: int = None, order: str = 'desc') -> 'pd.DataFrame':
-        """
-        读取股票K线数据
+        """.. deprecated:: 使用 StockRepo.read_stock 代替"""
+        import warnings
+        warnings.warn("DBManager.read_stock 已废弃，请使用 StockRepo.read_stock", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().read_stock(stock_code, start_date, end_date, limit, order)
 
-        Args:
-            stock_code: 股票代码，例如000001
-            start_date: 开始日期，格式为YYYY-MM-DD，None表示无限制
-            end_date: 结束日期，格式为YYYY-MM-DD，None表示无限制
-            limit: 限制返回的行数，None表示无限制
-            order: 排序方式，'asc'升序(默认)或'desc'降序，默认返回最新数据
-
-        Returns:
-            pd.DataFrame: 股票数据，包含date, open, high, low, close, volume等列，date为索引
-        """
-        import pandas as pd
-
-        try:
-            # 从数据库查询股票数据
-            sql = """
-                SELECT code, date, open, high, low, close, volume, market_cap, K, D, J
-                FROM stock_kline
-                WHERE code = ?
-            """
-            params = [stock_code]
-
-            # 添加日期范围条件（数据库中日期格式为 YYYY-MM-DD）
-            if start_date:
-                # 确保日期格式正确（YYYY-MM-DD）
-                start_date_formatted = start_date if '-' in start_date else f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}"
-                sql += " AND date >= ?"
-                params.append(start_date_formatted)
-
-            if end_date:
-                # 确保日期格式正确（YYYY-MM-DD）
-                end_date_formatted = end_date if '-' in end_date else f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}"
-                sql += " AND date <= ?"
-                params.append(end_date_formatted)
-            
-            # 按日期排列，limit默认返回最新数据
-            if order == 'desc':
-                sql += " ORDER BY date DESC"
-            else:
-                sql += " ORDER BY date ASC"
-            
-            if limit:
-                sql += f" LIMIT {limit}"
-            
-            results = self.query(sql, tuple(params))
-            
-            if not results:
-                logger.debug(f"股票数据为空: {stock_code}")
-                return pd.DataFrame()
-            
-            # 转换为DataFrame
-            df = pd.DataFrame(results)
-            # 转换date列为datetime类型
-            df['date'] = pd.to_datetime(df['date'])
-            logger.debug(f"读取股票数据成功: {stock_code}, 行数: {len(df)}")
-            return df
-        except Exception as e:
-            logger.error(f"读取股票数据失败: {stock_code} - {str(e)}")
-            return pd.DataFrame()
-    
     def write_stock(self, stock_code: str, df: 'pd.DataFrame') -> bool:
-        """
-        写入股票K线数据
-        
-        Args:
-            stock_code: 股票代码
-            df: 股票数据DataFrame，必须包含date列
-        
-        Returns:
-            bool: 是否写入成功
-        """
-        # stock_code: 股票代码，类型str，必填
-        # df: 股票数据，类型DataFrame，必填
-        if df.empty:
-            logger.warning(f"股票数据为空，跳过写入: {stock_code}")
-            return False
-        
-        try:
-            # 统一日期格式为 YYYY-MM-DD
-            from utils.date_utils import normalize_date
-            
-            # 去重：按日期去重，保留最后出现的
-            df = df.drop_duplicates(subset=['date'], keep='last')
-            
-            # 准备数据列表
-            data_list = []
-            for _, row in df.iterrows():
-                # 统一日期格式为 YYYY-MM-DD
-                normalized_date = normalize_date(row['date'])
-                data = {
-                    'code': stock_code,
-                    'date': normalized_date,
-                    'open': float(row.get('open', 0)) if pd.notna(row.get('open')) else None,
-                    'high': float(row.get('high', 0)) if pd.notna(row.get('high')) else None,
-                    'low': float(row.get('low', 0)) if pd.notna(row.get('low')) else None,
-                    'close': float(row.get('close', 0)) if pd.notna(row.get('close')) else None,
-                    'volume': int(row.get('volume', 0)) if pd.notna(row.get('volume')) else None,
-                    'market_cap': float(row.get('market_cap', 0)) if pd.notna(row.get('market_cap')) else None,
-                    'K': float(row.get('K', 0)) if pd.notna(row.get('K')) else None,
-                    'D': float(row.get('D', 0)) if pd.notna(row.get('D')) else None,
-                    'J': float(row.get('J', 0)) if pd.notna(row.get('J')) else None,
-                }
-                data_list.append(data)
-            
-            # 使用事务批量插入或更新
-            with self.transaction():
-                for data in data_list:
-                    # 先尝试删除已存在的数据
-                    self.delete('stock_kline', {'code': stock_code, 'date': data['date']})
-                    # 再插入新数据
-                    self.insert('stock_kline', data)
-            
-            logger.debug(f"写入股票数据成功: {stock_code}, 行数: {len(data_list)}")
-            return True
-        except Exception as e:
-            logger.error(f"写入股票数据失败: {stock_code} - {str(e)}")
-            return False
-    
+        """.. deprecated:: 使用 StockRepo.write_stock 代替"""
+        import warnings
+        warnings.warn("DBManager.write_stock 已废弃，请使用 StockRepo.write_stock", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().write_stock(stock_code, df)
+
     def update_stock(self, stock_code: str, new_df: 'pd.DataFrame') -> bool:
-        """
-        增量更新股票数据
-        
-        Args:
-            stock_code: 股票代码
-            new_df: 新的股票数据DataFrame
-        
-        Returns:
-            bool: 是否更新成功
-        """
-        # stock_code: 股票代码，类型str，必填
-        # new_df: 新的股票数据，类型DataFrame，必填
-        if new_df.empty:
-            logger.warning(f"新股票数据为空，跳过更新: {stock_code}")
-            return False
-        
-        try:
-            # 读取现有数据
-            existing_df = self.read_stock(stock_code)
-            
-            # 合并数据
-            if not existing_df.empty:
-                combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-            else:
-                combined_df = new_df
-            
-            # 写入合并后的数据
-            return self.write_stock(stock_code, combined_df)
-        except Exception as e:
-            logger.error(f"更新股票数据失败: {stock_code} - {str(e)}")
-            return False
-    
+        """.. deprecated:: 使用 StockRepo.update_stock 代替"""
+        import warnings
+        warnings.warn("DBManager.update_stock 已废弃，请使用 StockRepo.update_stock", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().update_stock(stock_code, new_df)
+
     def list_all_stocks(self) -> List[str]:
-        """
-        列出所有已保存的股票代码
-        
-        Returns:
-            List[str]: 股票代码列表，已排序
-        """
-        # 返回所有股票代码列表
-        try:
-            sql = "SELECT DISTINCT code FROM stock_kline ORDER BY code"
-            results = self.query(sql)
-            stocks = [row['code'] for row in results]
-            logger.debug(f"列出所有股票成功，共{len(stocks)}只")
-            return stocks
-        except Exception as e:
-            # 如果表不存在或查询失败，返回空列表
-            logger.debug(f"列出所有股票失败: {str(e)}")
-            return []
-    
+        """.. deprecated:: 使用 StockRepo.list_all_stocks 代替"""
+        import warnings
+        warnings.warn("DBManager.list_all_stocks 已废弃，请使用 StockRepo.list_all_stocks", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().list_all_stocks()
+
     def stock_exists(self, stock_code: str) -> bool:
-        """
-        检查股票数据是否存在
-        
-        Args:
-            stock_code: 股票代码
-        
-        Returns:
-            bool: 股票数据是否存在
-        """
-        # stock_code: 股票代码，类型str，必填
-        try:
-            sql = "SELECT COUNT(*) as count FROM stock_kline WHERE code = ?"
-            result = self.query_one(sql, (stock_code,))
-            exists = result and result['count'] > 0
-            logger.debug(f"检查股票存在性: {stock_code}, 存在: {exists}")
-            return exists
-        except Exception as e:
-            # 如果表不存在或查询失败，返回False
-            logger.debug(f"检查股票存在性失败: {stock_code} - {str(e)}")
-            return False
-    
+        """.. deprecated:: 使用 StockRepo.stock_exists 代替"""
+        import warnings
+        warnings.warn("DBManager.stock_exists 已废弃，请使用 StockRepo.stock_exists", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().stock_exists(stock_code)
+
     def get_stock_count(self) -> int:
-        """
-        获取已保存的股票数量
-        
-        Returns:
-            int: 股票数量
-        """
-        # 返回不同股票代码的数量
-        try:
-            sql = "SELECT COUNT(DISTINCT code) as count FROM stock_kline"
-            result = self.query_one(sql)
-            count = result['count'] if result else 0
-            logger.debug(f"获取股票数量成功: {count}")
-            return count
-        except Exception as e:
-            # 如果表不存在或查询失败，返回0
-            logger.debug(f"获取股票数量失败: {str(e)}")
-            return 0
+        """.. deprecated:: 使用 StockRepo.get_stock_count 代替"""
+        import warnings
+        warnings.warn("DBManager.get_stock_count 已废弃，请使用 StockRepo.get_stock_count", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().get_stock_count()
 
     def get_latest_trading_date(self) -> str:
-        """
-        获取数据库中所有股票的最晚交易日期（统一交易日）
-
-        Returns:
-            str: 最晚交易日期（YYYY-MM-DD格式），如果失败返回None
-        """
-        try:
-            from utils.date_utils import normalize_date
-            sql = "SELECT MAX(date) as max_date FROM stock_kline"
-            result = self.query_one(sql)
-            max_date = result['max_date'] if result and result.get('max_date') else None
-            if max_date:
-                # 使用统一的日期转换工具
-                max_date = normalize_date(max_date)
-            logger.debug(f"获取最晚交易日期成功: {max_date}")
-            return max_date
-        except Exception as e:
-            logger.debug(f"获取最晚交易日期失败: {str(e)}")
-            return None
+        """.. deprecated:: 使用 StockRepo.get_latest_trading_date 代替"""
+        import warnings
+        warnings.warn("DBManager.get_latest_trading_date 已废弃，请使用 StockRepo.get_latest_trading_date", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().get_latest_trading_date()
 
     def get_stock_name(self, stock_code: str) -> str:
-        """
-        从 stock_basic 表获取股票名称
-        
-        参数:
-            stock_code: 股票代码（6位数字）
-        
-        返回:
-            str: 股票名称，如果不存在则返回 '未知'
-        """
-        try:
-            sql = "SELECT name FROM stock_basic WHERE code = ?"
-            result = self.query_one(sql, (stock_code,))
-            if result and result.get('name'):
-                return result['name']
-            return '未知'
-        except Exception as e:
-            logger.debug(f"获取股票名称失败: {stock_code} - {str(e)}")
-            return '未知'
-    
+        """.. deprecated:: 使用 StockRepo.get_stock_name 代替"""
+        import warnings
+        warnings.warn("DBManager.get_stock_name 已废弃，请使用 StockRepo.get_stock_name", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().get_stock_name(stock_code)
+
     def get_all_stock_names(self) -> dict:
-        """
-        获取所有股票的代码和名称映射
-        
-        返回:
-            dict: {代码: 名称} 的字典
-        """
-        try:
-            sql = "SELECT code, name FROM stock_basic WHERE code IS NOT NULL"
-            results = self.query(sql)
-            stock_names = {}
-            for row in results:
-                code = row.get('code')
-                name = row.get('name', '未知')
-                if code:
-                    stock_names[code] = name
-            logger.debug(f"获取所有股票名称成功: {len(stock_names)} 只")
-            return stock_names
-        except Exception as e:
-            logger.debug(f"获取所有股票名称失败: {str(e)}")
-            return {}
+        """.. deprecated:: 使用 StockRepo.get_all_stock_names 代替"""
+        import warnings
+        warnings.warn("DBManager.get_all_stock_names 已废弃，请使用 StockRepo.get_all_stock_names", DeprecationWarning, stacklevel=2)
+        return self._get_stock_repo().get_all_stock_names()

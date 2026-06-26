@@ -160,10 +160,11 @@ ensure_database_schema()
 logger.info("数据库模式检查完成")
 
 # 导入全局数据库管理器
-from utils.global_db import get_global_db
+from utils.global_db import get_global_db, get_stock_repo
 
 # 全局实例
 db_manager = get_global_db()
+stock_repo = get_stock_repo()
 registry = get_registry("config/strategy_params.yaml")
 # 注释掉QuantSystem初始化，避免数据库初始化错误
 # quant_system = QuantSystem("config/config.yaml")
@@ -660,8 +661,8 @@ def get_stock_detail(code):
     """获取单只股票详情"""
     try:
         # 从数据库读取股票数据
-        df = db_manager.read_stock(code)
-        
+        df = stock_repo.read_stock(code)
+
         # 如果数据库没有数据，尝试从Tushare实时获取
         if df.empty:
             logger.info(f"数据库中无 {code} 数据，尝试从Tushare获取")
@@ -881,10 +882,10 @@ def run_selection():
         try:
             func_logger.info("开始加载股票数据...")
             # 从数据库获取所有股票代码
-            stock_codes = db_manager.list_all_stocks()
+            stock_codes = stock_repo.list_all_stocks()
 
             # 从数据库获取所有股票名称（不再使用 stock_names.json）
-            stock_names = db_manager.get_all_stock_names()
+            stock_names = stock_repo.get_all_stock_names()
             func_logger.info(f"加载了 {len(stock_codes)} 只股票数据")
         except Exception as e:
             func_logger.error(f"加载股票数据失败: {str(e)}")
@@ -901,7 +902,7 @@ def run_selection():
             for idx, code in enumerate(stock_codes):
                 try:
                     # 读取完整数据，如果指定了结束日期，则只读取到该日期的数据
-                    full_df = db_manager.read_stock(code, end_date=end_date)
+                    full_df = stock_repo.read_stock(code, end_date=end_date)
                     if not full_df.empty and len(full_df) >= 30:
                         # 按日期降序排序（最新的在前）
                         full_df = full_df.sort_values('date', ascending=False)
@@ -1233,7 +1234,7 @@ def run_selection():
                     name = stock['name']
                     
                     # 读取股票数据
-                    df = db_manager.read_stock(code)
+                    df = stock_repo.read_stock(code)
                     if df.empty:
                         continue
                     
@@ -1707,7 +1708,7 @@ def get_stats():
     """获取系统统计信息"""
     try:
         # 从数据库获取所有股票代码
-        stocks = db_manager.list_all_stocks()
+        stocks = stock_repo.list_all_stocks()
         
         # 获取K线数据的最新日期（表示数据更新到了哪一天）
         # 使用SQL直接查询所有股票的最新日期
@@ -3620,7 +3621,7 @@ def get_portfolio():
                     # 获取最新价格（从数据库获取working_date的收盘价）
                     current_price = pos.get('current_price', 0)
                     try:
-                        df_price = runner.db_manager.read_stock(stock_code)
+                        df_price = runner.stock_repo.read_stock(stock_code)
                         if df_price is not None and not df_price.empty:
                             # 查找working_date对应的行
                             price_row = df_price[df_price['date'] == working_date]
@@ -3739,7 +3740,7 @@ def sell_position():
         # 获取当前价格
         current_price = position.get('current_price', 0)
         try:
-            df_price = runner.db_manager.read_stock(stock_code)
+            df_price = runner.stock_repo.read_stock(stock_code)
             if df_price is not None and not df_price.empty:
                 price_row = df_price[df_price['date'] == working_date]
                 if not price_row.empty:
@@ -3983,7 +3984,7 @@ def get_stock_pool():
             # 获取最新价格（从数据库获取working_date的收盘价）
             current_price = stock.get('signal', {}).get('close', 0)
             try:
-                df_price = runner.db_manager.read_stock(stock_code)
+                df_price = runner.stock_repo.read_stock(stock_code)
                 if df_price is not None and not df_price.empty:
                     # 查找working_date对应的行
                     price_row = df_price[df_price['date'] == working_date]

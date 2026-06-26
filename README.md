@@ -221,6 +221,9 @@ Windows 用户也可以直接双击根目录下 `start.bat` 文件自动处理
 │   └── ...
 ├── utils/                       # 工具模块
 │   ├── akshare_fetcher.py       # AKShare数据获取
+│   ├── db_manager.py            # 通用数据库管理器（SQLite连接池、事务）
+│   ├── stock_repo.py            # 股票数据仓库（K线/基本信息查询）
+│   ├── global_db.py             # 全局 DBManager/StockRepo 单例
 │   ├── csv_manager.py           # CSV数据管理
 │   ├── technical.py             # 技术指标
 │   ├── kline_chart.py           # K线图生成

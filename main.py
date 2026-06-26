@@ -53,8 +53,9 @@ class QuantSystem:
         init_databases_if_needed(self.data_dir)
         
         # 初始化数据库管理器
-        from utils.global_db import get_global_db
+        from utils.global_db import get_global_db, get_stock_repo
         self.db_manager = get_global_db()
+        self.stock_repo = get_stock_repo()
         self.fetcher = AKShareFetcher(self.data_dir)
         self.registry = get_registry("config/strategy_params.yaml")
     
@@ -71,10 +72,9 @@ class QuantSystem:
         """加载股票名称（从数据库读取，不再使用 stock_names.json）"""
         try:
             # 从数据库读取所有股票名称
-            from utils.db_manager import DBManager
-            from utils.global_db import get_global_db
-            db_manager = get_global_db()
-            stock_names = db_manager.get_all_stock_names()
+            from utils.global_db import get_stock_repo
+            stock_repo = get_stock_repo()
+            stock_names = stock_repo.get_all_stock_names()
             
             if stock_names:
                 return stock_names
@@ -111,7 +111,7 @@ class QuantSystem:
         if check_latest:
             print("\n🔍 检查数据更新状态...")
             # 从数据库获取所有股票代码
-            stock_codes = self.db_manager.list_all_stocks()
+            stock_codes = self.stock_repo.list_all_stocks()
             if max_stocks:
                 stock_codes = stock_codes[:max_stocks]
 
@@ -122,7 +122,7 @@ class QuantSystem:
 
             for code in stock_codes[:check_limit]:
                 # 从数据库读取股票数据
-                df = self.db_manager.read_stock(code)
+                df = self.stock_repo.read_stock(code)
                 if not df.empty:
                     latest_date = pd.to_datetime(df.iloc[0]['date']).date()
                     if latest_date == today:
@@ -196,8 +196,8 @@ class QuantSystem:
         # 加载股票数据（流式处理，不预存全部数据）
         print("\n执行选股（流式处理，降低内存占用）...")
         # 从数据库获取所有股票代码
-        stock_codes = self.db_manager.list_all_stocks()
-        
+        stock_codes = self.stock_repo.list_all_stocks()
+
         if not stock_codes:
             print("✗ 没有股票数据，请先执行 init 或 update")
             return {}, {}, {}
@@ -224,7 +224,7 @@ class QuantSystem:
             
             for i, code in enumerate(process_codes, 1):
                 # 从数据库读取单只股票
-                df = self.db_manager.read_stock(code)
+                df = self.stock_repo.read_stock(code)
                 name = stock_names.get(code, '未知')
                 
                 # 过滤

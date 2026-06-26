@@ -36,14 +36,20 @@ class VectorBTDataLoader:
     负责从数据库加载数据到矩阵格式
     """
     
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, stock_repo=None):
         """
         初始化数据加载器
-        
+
         参数:
             db_manager: 数据库管理器
+            stock_repo: 股票数据仓库（可选，默认从 db_manager 创建）
         """
         self.db_manager = db_manager
+        if stock_repo is not None:
+            self.stock_repo = stock_repo
+        else:
+            from utils.stock_repo import StockRepo
+            self.stock_repo = StockRepo(db_manager)
     
     def load_data(self, start_date: str, end_date: str) -> Tuple[pd.DataFrame, List[str], List[str]]:
         """
@@ -76,7 +82,7 @@ class VectorBTDataLoader:
             for code in codes:
                 try:
                     # 从数据库加载该股票的K线数据
-                    df = self.db_manager.read_stock(code, start_date, end_date)
+                    df = self.stock_repo.read_stock(code, start_date, end_date)
                     
                     if df is not None and len(df) > 0:
                         # 提取日期和收盘价
@@ -258,7 +264,7 @@ class VectorBTDataLoader:
             股票代码列表
         """
         try:
-            codes = self.db_manager.list_all_stocks()
+            codes = self.stock_repo.list_all_stocks()
             return codes if codes else []
         except Exception as e:
             logger.error(f"获取股票代码列表失败: {str(e)}")
@@ -272,15 +278,20 @@ class VectorBTBacktestEngine:
     统一的回测引擎接口，整合数据加载、信号生成、回测执行
     """
     
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, stock_repo=None):
         """
         初始化回测引擎
-        
+
         参数:
             db_manager: 数据库管理器
+            stock_repo: 股票数据仓库（可选）
         """
         self.db_manager = db_manager
-        self.data_loader = VectorBTDataLoader(db_manager)
+        if stock_repo is None:
+            from utils.stock_repo import StockRepo
+            stock_repo = StockRepo(db_manager)
+        self.stock_repo = stock_repo
+        self.data_loader = VectorBTDataLoader(db_manager, stock_repo)
         self.signal_generator = VectorBTSignalGenerator()
         self.backtest_executor = VectorBTBacktestExecutor()
     

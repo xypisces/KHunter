@@ -151,8 +151,9 @@ class StrategyRunner:
         if args:
             db_path = args[0]
         
-        from utils.global_db import get_global_db
+        from utils.global_db import get_global_db, get_stock_repo
         self.db_manager = get_global_db()
+        self.stock_repo = get_stock_repo()
         self.akshare_fetcher = AKShareFetcher("data")
         self.strategy_registry = StrategyRegistry()
         # 自动注册所有策略
@@ -551,14 +552,14 @@ class StrategyRunner:
         logger.info(f"预加载股票数据: {extended_start} ~ {current_date} (历史: {required_days}天)")
         
         # 获取所有股票代码
-        stock_codes = self.db_manager.list_all_stocks()
+        stock_codes = self.stock_repo.list_all_stocks()
         total = len(stock_codes)
         loaded = 0
         skipped = 0
-        
+
         for i, code in enumerate(stock_codes):
             try:
-                df = self.db_manager.read_stock(code)
+                df = self.stock_repo.read_stock(code)
                 
                 if df is None or (hasattr(df, 'empty') and df.empty) or len(df) < 60:
                     skipped += 1
@@ -2951,12 +2952,10 @@ class StrategyRunner:
         try:
             if stock_code in self.stock_name_cache:
                 return self.stock_name_cache[stock_code]
-            
+
             # 从数据库获取
-            query = "SELECT name FROM stock_basic WHERE code = ?"
-            result = self.db_manager.query_one(query, (stock_code,))
-            if result:
-                name = result['name']
+            name = self.stock_repo.get_stock_name(stock_code)
+            if name and name != '未知':
                 self.stock_name_cache[stock_code] = name
                 return name
             return stock_code

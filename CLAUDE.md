@@ -72,8 +72,10 @@ akshare API → utils/数据获取 → SQLite (data/stock_selection.db)
 ### 数据库
 
 - 主数据库：`data/stock_selection.db`（SQLite）
-- 全局访问：`utils/global_db.py` 的 `get_global_db()` 获取 `DBManager` 单例
-- DBManager 是唯一的数据库后端（CSV 后端已移除），提供线程安全的连接池和事务管理
+- 全局访问：`utils/global_db.py` 的 `get_global_db()` 获取 `DBManager` 单例，`get_stock_repo()` 获取 `StockRepo` 单例
+- DBManager 提供通用 SQLite 操作（连接池、事务管理、CRUD）
+- StockRepo 封装股票领域查询（K 线读写、股票名称等），通过构造函数注入 DBManager
+- 股票相关操作统一使用 `StockRepo`，DBManager 上的旧股票方法已 deprecated
 - B1 图形库缓存：`data/cache/b1_pattern_library_cache.json`
 
 ### Web 前端
