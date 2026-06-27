@@ -430,7 +430,7 @@ class SelectionRecordManager:
             
             # 如果stock_basic表中没有，尝试使用industry_fetcher获取
             try:
-                from utils.industry_fetcher import IndustryFetcher
+                from utils.fundamental.industry_fetcher import IndustryFetcher
                 from utils.cache_manager import CacheManager
                 
                 cache_manager = CacheManager()

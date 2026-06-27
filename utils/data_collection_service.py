@@ -15,11 +15,11 @@ from utils.akshare_fetcher import AKShareFetcher
 from utils.db_manager import DBManager
 from utils.trading_time_validator import TradingTimeValidator
 from utils.new_stock_detector import NewStockDetector
-from utils.stock_data_fetcher import StockDataFetcher
+from utils.market_data.stock_fetcher import StockDataFetcher
 from utils.data_initializer import DataInitializer
 from utils.kline_updater import KlineUpdater
 from utils.fund_flow_updater import FundFlowUpdater
-from utils.fund_flow_fetcher import FundFlowFetcher
+from utils.fund_flow.fund_flow_fetcher import FundFlowFetcher
 from datetime import timedelta
 
 # 配置日志

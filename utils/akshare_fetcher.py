@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Optional, Dict, List
 
 # 导入各个模块
-from utils.stock_data_fetcher import StockDataFetcher
-from utils.kline_fetcher import KlineFetcher
-from utils.fund_flow_fetcher import FundFlowFetcher
+from utils.market_data.stock_fetcher import StockDataFetcher
+from utils.market_data.kline_fetcher import KlineFetcher
+from utils.fund_flow.fund_flow_fetcher import FundFlowFetcher
 from utils.data_initializer import DataInitializer
 from utils.collector_manager import CollectorManager
 from utils.db_manager import DBManager

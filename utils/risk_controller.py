@@ -6,7 +6,7 @@ from typing import Optional
 from datetime import datetime
 from pathlib import Path
 
-from utils.index_data_fetcher import IndexDataFetcher
+from utils.market_data.index_fetcher import IndexDataFetcher
 from utils.var_calculator import EnhancedVaRCalculator
 from utils.risk_manager import RiskManager, RiskStatus
 from utils.risk_config_loader import RiskConfigLoader

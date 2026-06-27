@@ -37,7 +37,7 @@ class KlineUpdater:
         self.db_manager = db_manager
         self.stock_data_fetcher = stock_data_fetcher
 
-        from utils.kline_fetcher import KlineFetcher
+        from utils.market_data.kline_fetcher import KlineFetcher
         self.kline_fetcher = KlineFetcher(db_manager, stock_data_fetcher)
 
         self.stats = {

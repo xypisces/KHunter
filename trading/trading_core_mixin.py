@@ -107,9 +107,9 @@ class TradingCoreMixin:
         self.akshare_fetcher = AKShareFetcher("data")
         self.strategy_registry = StrategyRegistry()
 
-        from utils.stock_data_fetcher import StockDataFetcher
+        from utils.market_data.stock_fetcher import StockDataFetcher
         self.stock_data_fetcher = StockDataFetcher("data")
-        from utils.kline_fetcher import KlineFetcher
+        from utils.market_data.kline_fetcher import KlineFetcher
         self.kline_fetcher = KlineFetcher(self.db_manager, self.stock_data_fetcher)
 
         self.score_calculator = BacktestScoreCalculator(db_manager=self.db_manager)

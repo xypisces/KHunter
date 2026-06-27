@@ -240,7 +240,7 @@ class ExdividendUtils:
         Returns:
             检测结果字典
         """
-        from utils.stock_data_fetcher import StockDataFetcher
+        from utils.market_data.stock_fetcher import StockDataFetcher
         
         fetcher = StockDataFetcher()
         return fetcher.check_exdividend_by_factor(stock_codes, trade_date, start_date)
