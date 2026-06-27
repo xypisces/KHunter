@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>架构审查 — KHunter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 6 4; }
+      .leak { stroke: #dc2626; stroke-width: 2px; }
+      .deep-box {
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: #e2e8f0;
+        border: 2px solid #334155;
+      }
+      .shallow-box {
+        background: #f8fafc;
+        border: 2px dashed #94a3b8;
+        color: #475569;
+      }
+      .module-label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-family: ui-monospace, monospace;
+      }
+      .badge-strong { background: #059669; color: white; }
+      .badge-worth { background: #d97706; color: white; }
+      .badge-speculative { background: #64748b; color: white; }
+      .diagram-container {
+        min-height: 320px;
+        display: flex;
+        gap: 1.5rem;
+      }
+      .diagram-side {
+        flex: 1;
+        min-width: 0;
+      }
+      .cross-section-band {
+        height: 2.5rem;
+        border-left: 4px solid;
+        display: flex;
+        align-items: center;
+        padding-left: 0.75rem;
+        font-size: 0.75rem;
+        font-family: ui-monospace, monospace;
+      }
+      .mass-interface {
+        background: #e2e8f0;
+        border: 2px solid #94a3b8;
+        border-radius: 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .mass-impl {
+        background: #f1f5f9;
+        border: 1px dashed #cbd5e1;
+        border-radius: 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.6rem;
+        color: #64748b;
+      }
+      .wins-list li::before {
+        content: "→ ";
+        color: #059669;
+        font-weight: 600;
+      }
+      .callout-warn {
+        background: #fffbeb;
+        border-left: 4px solid #d97706;
+        padding: 0.75rem 1rem;
+        font-size: 0.85rem;
+        color: #92400e;
+      }
+      .dead-code {
+        background: #fef2f2;
+        border: 2px dashed #fca5a5;
+        color: #991b1b;
+      }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <!-- Header -->
+      <header class="space-y-4">
+        <h1 class="text-3xl font-serif font-bold text-slate-800">KHunter 架构审查</h1>
+        <p class="text-sm text-slate-500">2026-06-27 · 基于代码库当前状态（dev 分支）</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600">
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-4 border-2 border-slate-400 bg-white rounded-sm inline-block"></span> 模块
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-0 border-t-2 border-dashed border-slate-400 inline-block"></span> 接缝
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-0 border-t-2 border-red-500 inline-block" style="border-width:2px"></span> 泄漏
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-4 border-2 border-slate-700 bg-slate-800 rounded-sm inline-block"></span> 深模块
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-5 h-4 border-2 border-red-300 bg-red-50 rounded-sm inline-block"></span> 死代码
+          </span>
+        </div>
+      </header>
+
+      <!-- Candidates -->
+      <section id="candidates" class="space-y-10">
+
+        <!-- Candidate 1: Dead Code Cleanup -->
+        <article id="c1-dead-code" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold text-slate-800">清理 5000+ 行死代码</h2>
+            <span class="badge-strong text-xs px-2 py-0.5 rounded-full font-medium">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">
+            trading/routes.py · trading/strategy_runner_v2.py · trading/vectorbt_prototype.py · trading/vectorbt_demo.py · strategy/__init__.py
+          </p>
+
+          <div class="diagram-container">
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</p>
+              <div class="space-y-2">
+                <div class="dead-code rounded p-3">
+                  <p class="module-label text-red-700 font-bold">trading/routes.py</p>
+                  <p class="text-xs text-red-600 mt-1">2775 行 · 37 路由 · 从未导入</p>
+                  <p class="text-xs text-red-500">含语法错误，执行即崩溃</p>
+                </div>
+                <div class="dead-code rounded p-2">
+                  <p class="module-label text-red-700">strategy_runner_v2.py</p>
+                  <p class="text-xs text-red-500">291 行 · 从未导入</p>
+                </div>
+                <div class="dead-code rounded p-2">
+                  <p class="module-label text-red-700">vectorbt_prototype.py + demo.py</p>
+                  <p class="text-xs text-red-500">实验代码 · 从未使用</p>
+                </div>
+                <div class="dead-code rounded p-2">
+                  <p class="module-label text-red-700">strategy/__init__.py STRATEGIES dict</p>
+                  <p class="text-xs text-red-500">硬编码 2 策略 · 实际用 StrategyRegistry</p>
+                </div>
+              </div>
+            </div>
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</p>
+              <div class="flex items-center justify-center h-full">
+                <div class="text-center">
+                  <div class="text-6xl mb-4">🗑️</div>
+                  <p class="text-sm text-slate-500 font-mono">git rm</p>
+                  <p class="text-xs text-slate-400 mt-2">零运行时影响</p>
+                  <p class="text-xs text-slate-400">trading/ 减少 ~3100 行</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Problem</p>
+              <p class="text-sm text-slate-600">5000+ 行死代码散布在 trading/ 和 strategy/ 目录中。trading/routes.py 包含语法错误和未导入的模块引用，执行即崩溃。strategy_runner_v2.py 是从未接入的重写版本。这些文件让 grep、IDE 跳转和代码审查产生误报。</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Solution</p>
+              <p class="text-sm text-slate-600">直接删除。每个文件都通过了删除测试——删除后零运行时影响。strategy/__init__.py 的 STRATEGIES dict 同理，保留空 __init__.py 即可。</p>
+            </div>
+          </div>
+
+          <ul class="wins-list text-sm text-slate-600 space-y-1">
+            <li>locality: 搜索结果不再被死代码污染</li>
+            <li>leverage: 目录结构真实反映运行时依赖</li>
+            <li>AI-navigability: 上下文窗口不再浪费在死代码上</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 2: Consolidate Sell Logic -->
+        <article id="c2-sell-logic" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold text-slate-800">统一卖出逻辑：BacktestEngine ↔ StrategyRunner</h2>
+            <span class="badge-strong text-xs px-2 py-0.5 rounded-full font-medium">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">
+            trading/backtest_engine.py · trading/strategy_runner.py · trading/trading_core_mixin.py
+          </p>
+
+          <div class="diagram-container">
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</p>
+              <pre class="mermaid">
+                flowchart TD
+                  subgraph BE["BacktestEngine (1871 lines)"]
+                    BE1["_process_sell()"]
+                    BE2["止损 · 追踪止损 · 冷却"]
+                    BE3["含交易成本的收益率"]
+                    BE1 --> BE2 --> BE3
+                  end
+                  subgraph SR["StrategyRunner (3400 lines)"]
+                    SR1["_execute_sell_operations()"]
+                    SR2["止损 · 追踪止损 · 冷却"]
+                    SR3["不同成本模型"]
+                    SR1 --> SR2 --> SR3
+                  end
+                  BE2 -.leak.->|"逻辑漂移"| SR2
+                  classDef leak stroke:#dc2626,stroke-width:2px;
+                  class BE2,SR2 leak
+              </pre>
+            </div>
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</p>
+              <pre class="mermaid">
+                flowchart TD
+                  subgraph TCM["TradingCoreMixin — 深模块"]
+                    direction TB
+                    IF["sell_position(position, price, date)"]
+                    IMPL["止损 · 追踪止损 · 冷却 · 成本"]
+                    IF --> IMPL
+                  end
+                  BE2["BacktestEngine"] -->|"调用"| IF
+                  SR2["StrategyRunner"] -->|"调用"| IF
+                  classDef deep fill:#1e293b,color:#e2e8f0,stroke:#334155
+                  class TCM deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Problem</p>
+              <p class="text-sm text-slate-600">BacktestEngine._process_sell() 和 StrategyRunner._execute_sell_operations() 实现了相同的止损/追踪止损/冷却逻辑，但成本模型已经漂移。回测结果和实盘可能不一致。TradingCoreMixin 只抽取了状态初始化，最复杂的卖出循环反而被复制了。</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Solution</p>
+              <p class="text-sm text-slate-600">将卖出逻辑下沉到 TradingCoreMixin，统一成本模型。BacktestEngine 和 StrategyRunner 都通过同一接口调用。回测和实盘共用同一实现，消除漂移。</p>
+            </div>
+          </div>
+
+          <ul class="wins-list text-sm text-slate-600 space-y-1">
+            <li>locality: 卖出逻辑集中在一个模块，修复一次全部生效</li>
+            <li>leverage: 两个消费者共享一个接口</li>
+            <li>回测和实盘结果一致性得到保证</li>
+            <li>测试: 一次编写，两种模式验证</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 3: Adopt indicators/ Module -->
+        <article id="c3-indicators" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold text-slate-800">激活 indicators/ 模块：策略层迁移</h2>
+            <span class="badge-strong text-xs px-2 py-0.5 rounded-full font-medium">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">
+            indicators/__init__.py · utils/technical.py · strategy/*.py (15+ 文件)
+          </p>
+
+          <div class="diagram-container">
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</p>
+              <pre class="mermaid">
+                flowchart LR
+                  subgraph Strategies["15+ 策略"]
+                    S1["w_bottom"]
+                    S2["bottom_trend"]
+                    S3["trend_accel"]
+                    S4["..."]
+                  end
+                  OLD["utils/technical.py<br/>(deprecated shim)"]
+                  RAW["raw pandas<br/>.ewm() / .rolling()"]
+                  NEW["indicators/<br/>(自动升序/降序)"]
+                  S1 --> OLD
+                  S2 --> RAW
+                  S3 --> OLD
+                  S4 --> OLD
+                  NEW -.->|"0 个使用者"| Strategies
+              </pre>
+            </div>
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</p>
+              <pre class="mermaid">
+                flowchart LR
+                  subgraph Strategies["15+ 策略"]
+                    S1["w_bottom"]
+                    S2["bottom_trend"]
+                    S3["trend_accel"]
+                    S4["..."]
+                  end
+                  IND["indicators/<br/>(唯一实现)"]
+                  S1 --> IND
+                  S2 --> IND
+                  S3 --> IND
+                  S4 --> IND
+                  classDef deep fill:#1e293b,color:#e2e8f0,stroke:#334155
+                  class IND deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Problem</p>
+              <p class="text-sm text-slate-600">indicators/ 模块已实现自动升序/降序检测，但零策略使用它。15+ 策略仍然导入已 deprecated 的 utils/technical.py，或直接用 raw pandas 计算。每个策略自行处理排序方向，calculate_indicators() 合约完全未定义。</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Solution</p>
+              <p class="text-sm text-slate-600">逐策略迁移到 indicators/，同时删除 utils/technical.py 的 deprecated 转发层。在 BaseStrategy.calculate_indicators() 中明确合约：输入为升序 DataFrame。</p>
+            </div>
+          </div>
+
+          <ul class="wins-list text-sm text-slate-600 space-y-1">
+            <li>locality: 指标计算集中在一个模块</li>
+            <li>leverage: 一个接口覆盖 MA/EMA/KDJ/MACD/ATR/Bollinger</li>
+            <li>消除 15+ 策略中的排序方向隐式合约</li>
+            <li>测试: indicators/ 已有完善的属性测试</li>
+          </ul>
+
+          <div class="callout-warn">
+            ⚠️ 与 ADR-0001 一致：indicators/ 内部使用升序，每个指标函数自动检测输入排序。
+          </div>
+        </article>
+
+        <!-- Candidate 4: Strategy Name Resolution -->
+        <article id="c4-name-mapping" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold text-slate-800">统一策略名称解析</h2>
+            <span class="badge-strong text-xs px-2 py-0.5 rounded-full font-medium">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">
+            trading/stock_score_models.py · trading/technical_scorer.py · utils/strategy_name_mapper.py · trading/strategy_runner.py · trading/backtest_scorer.py
+          </p>
+
+          <div class="diagram-container">
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</p>
+              <div class="space-y-2">
+                <div class="shallow-box rounded p-2">
+                  <p class="module-label">stock_score_models.py</p>
+                  <p class="text-xs text-slate-500">STRATEGY_CLASS_NAME_MAP (20 条)</p>
+                </div>
+                <div class="shallow-box rounded p-2">
+                  <p class="module-label">technical_scorer.py</p>
+                  <p class="text-xs text-slate-500">inline class_name_map + 后缀匹配 ×4</p>
+                </div>
+                <div class="shallow-box rounded p-2">
+                  <p class="module-label">strategy_name_mapper.py</p>
+                  <p class="text-xs text-slate-500">又一个映射模块</p>
+                </div>
+                <div class="shallow-box rounded p-2">
+                  <p class="module-label">strategy_runner.py</p>
+                  <p class="text-xs text-slate-500">_get_strategy_name() 自带映射</p>
+                </div>
+                <div class="shallow-box rounded p-2">
+                  <p class="module-label">backtest_scorer.py</p>
+                  <p class="text-xs text-slate-500">后缀匹配 ×3</p>
+                </div>
+              </div>
+            </div>
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</p>
+              <pre class="mermaid">
+                flowchart TD
+                  subgraph SINGLE["StrategyNameResolver — 深模块"]
+                    direction TB
+                    IF["resolve(name) → class_name"]
+                    IMPL["中文名 → 类名 → YAML key<br/>统一映射表"]
+                    IF --> IMPL
+                  end
+                  A["technical_scorer"] --> IF
+                  B["backtest_scorer"] --> IF
+                  C["strategy_runner"] --> IF
+                  D["stock_score_models"] --> IF
+                  classDef deep fill:#1e293b,color:#e2e8f0,stroke:#334155
+                  class SINGLE deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Problem</p>
+              <p class="text-sm text-slate-600">策略名称在 5+ 个文件中独立解析。三种命名方案（中文名、类名、YAML key）各有各的 fallback 链。technical_scorer.py 单独文件内重复 4 次后缀匹配模式。新增策略必须在多处同步更新映射。</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Solution</p>
+              <p class="text-sm text-slate-600">将 utils/strategy_name_mapper.py 提升为唯一解析源，所有消费者通过它解析名称。映射表从 StrategyRegistry 自动生成，不再手动维护。</p>
+            </div>
+          </div>
+
+          <ul class="wins-list text-sm text-slate-600 space-y-1">
+            <li>locality: 名称映射集中在一个模块</li>
+            <li>leverage: 一个 resolve() 接口，5 个消费者</li>
+            <li>新增策略自动生效，无需手动更新映射</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 5: Score Weights Inconsistency -->
+        <article id="c5-score-weights" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold text-slate-800">修复评分权重不一致</h2>
+            <span class="badge-strong text-xs px-2 py-0.5 rounded-full font-medium">Strong</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">
+            trading/stock_score_models.py · trading/backtest_scorer.py · trading/technical_scorer.py
+          </p>
+
+          <div class="diagram-container">
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</p>
+              <div class="space-y-3">
+                <div class="border border-red-300 bg-red-50 rounded p-3">
+                  <p class="module-label text-red-700">stock_score_models.py (docstring)</p>
+                  <p class="text-xs text-red-600 font-mono mt-1">tech 0.25 + money 0.30 + fund 0.15 + sector 0.15 + event 0.15</p>
+                </div>
+                <div class="border border-amber-300 bg-amber-50 rounded p-3">
+                  <p class="module-label text-amber-700">stock_score_models.py (SCORE_WEIGHTS)</p>
+                  <p class="text-xs text-amber-600 font-mono mt-1">tech 0.35 + money 0.35 + fund 0.10 + sector 0.10 + event 0.10</p>
+                </div>
+                <div class="border border-amber-300 bg-amber-50 rounded p-3">
+                  <p class="module-label text-amber-700">backtest_scorer.py (inline)</p>
+                  <p class="text-xs text-amber-600 font-mono mt-1">tech 0.35 + money 0.35 + fund 0.10 + sector 0.10 + event 0.10</p>
+                </div>
+                <p class="text-xs text-red-500">⚠ docstring 与代码不一致 = 潜在 bug</p>
+              </div>
+            </div>
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</p>
+              <pre class="mermaid">
+                flowchart TD
+                  subgraph SINGLE["stock_score_models.py"]
+                    direction TB
+                    W["SCORE_WEIGHTS<br/>(唯一定义)"]
+                    D["docstring<br/>(自动生成或同步)"]
+                  end
+                  A["technical_scorer"] --> W
+                  B["backtest_scorer"] --> W
+                  C["stock_score_calculator"] --> W
+                  classDef deep fill:#1e293b,color:#e2e8f0,stroke:#334155
+                  class SINGLE deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Problem</p>
+              <p class="text-sm text-slate-600">StockScore 类的 docstring 声称权重是 0.25/0.30/0.15/0.15/0.15，但实际代码和 backtest_scorer 都用 0.35/0.35/0.10/0.10/0.10。docstring 是错误的。此外 backtest_scorer 内联了自己的 veto check，与 TechnicalScorer 的重复。</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Solution</p>
+              <p class="text-sm text-slate-600">修正 docstring。删除 backtest_scorer 的内联权重，统一从 SCORE_WEIGHTS 导入。将 veto check 下沉到共享层。</p>
+            </div>
+          </div>
+
+          <ul class="wins-list text-sm text-slate-600 space-y-1">
+            <li>locality: 权重定义集中在一个常量</li>
+            <li>消除 docstring 与代码的不一致</li>
+            <li>backtest 和实盘评分逻辑统一</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 6: Config Loading -->
+        <article id="c6-config" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold text-slate-800">统一配置加载</h2>
+            <span class="badge-worth text-xs px-2 py-0.5 rounded-full font-medium">Worth exploring</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">
+            config/ · main.py · web/app_factory.py · trading/trading_core_mixin.py · web/routes/system.py
+          </p>
+
+          <div class="diagram-container">
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</p>
+              <pre class="mermaid">
+                flowchart LR
+                  YAML["config.yaml"]
+                  A["QuantSystem<br/>._load_config()"] -->|yaml.safe_load| YAML
+                  B["app_factory<br/>._init_dependencies()"] -->|yaml.safe_load| YAML
+                  C["TradingCoreMixin<br/>._load_support_methods()"] -->|yaml.safe_load| YAML
+                  D["system.py route<br/>POST /api/config"] -->|yaml.dump| YAML
+                  E["system.py route<br/>GET /api/config"] -->|yaml.safe_load| YAML
+              </pre>
+            </div>
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</p>
+              <pre class="mermaid">
+                flowchart TD
+                  subgraph CONFIG["AppConfig — 深模块"]
+                    direction TB
+                    IF["get(key) / set(key, value)"]
+                    IMPL["加载 · 验证 · 缓存 · 写回"]
+                    IF --> IMPL
+                  end
+                  YAML["config.yaml"] --> IMPL
+                  A["QuantSystem"] --> IF
+                  B["app_factory"] --> IF
+                  C["TradingCoreMixin"] --> IF
+                  D["system.py route"] --> IF
+                  classDef deep fill:#1e293b,color:#e2e8f0,stroke:#334155
+                  class CONFIG deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Problem</p>
+              <p class="text-sm text-slate-600">config.yaml 在 5 个位置独立加载，无验证层，无单一事实来源。system.py 的 POST 直接写磁盘，造成运行时状态和文件的 split-brain。TradingCoreMixin 有自己的 class-level 缓存。DatabaseConfig 单例可能在 YAML 加载前就被构造。</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Solution</p>
+              <p class="text-sm text-slate-600">引入 AppConfig 单例，统一加载、验证和写回。所有模块通过同一接口访问配置。写操作通过 set() 方法，自动同步磁盘。</p>
+            </div>
+          </div>
+
+          <ul class="wins-list text-sm text-slate-600 space-y-1">
+            <li>locality: 配置加载集中在一个模块</li>
+            <li>leverage: 一个接口覆盖所有配置访问</li>
+            <li>消除 split-brain 问题</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 7: Shim Files -->
+        <article id="c7-shims" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold text-slate-800">删除 7 个 import * 转发层</h2>
+            <span class="badge-worth text-xs px-2 py-0.5 rounded-full font-medium">Worth exploring</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">
+            utils/stock_data_fetcher.py · utils/kline_fetcher.py · utils/fund_flow_fetcher.py · utils/industry_fetcher.py · utils/sector_fetcher.py · utils/event_fetcher.py · utils/index_data_fetcher.py
+          </p>
+
+          <div class="diagram-container">
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</p>
+              <pre class="mermaid">
+                flowchart LR
+                  subgraph SHIMS["utils/ (旧路径)"]
+                    A1["stock_data_fetcher.py"]
+                    A2["kline_fetcher.py"]
+                    A3["fund_flow_fetcher.py"]
+                    A4["..."]
+                  end
+                  subgraph REAL["utils/market_data/ (真实)"]
+                    B1["stock_fetcher.py"]
+                    B2["kline_fetcher.py"]
+                    B3["..."]
+                  end
+                  A1 -->|"import *"| B1
+                  A2 -->|"import *"| B2
+                  A3 -->|"import *"| B3
+              </pre>
+            </div>
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</p>
+              <pre class="mermaid">
+                flowchart LR
+                  subgraph REAL["utils/market_data/ · fund_flow/ · fundamental/ · event/"]
+                    B1["stock_fetcher.py"]
+                    B2["kline_fetcher.py"]
+                    B3["..."]
+                  end
+                  C["消费者"] -->|"直接导入"| B1
+                  C -->|"直接导入"| B2
+                  C -->|"直接导入"| B3
+              </pre>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Problem</p>
+              <p class="text-sm text-slate-600">7 个 shim 文件用 `from ... import *` 转发到真实模块。每个名字有两个导入路径。stock_data_fetcher.py shim 甚至转发了私有名字（_tushare_limiter）。IDE 的 "find usages" 和 grep 重构必须检查两条路径。</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Solution</p>
+              <p class="text-sm text-slate-600">一次性迁移：更新所有消费者导入路径到子包位置，然后删除 shim 文件。复杂度集中（迁移）而非持续存在（转发层）。</p>
+            </div>
+          </div>
+
+          <ul class="wins-list text-sm text-slate-600 space-y-1">
+            <li>locality: 每个名字只有一个定义位置</li>
+            <li>消除 import * 的命名空间污染</li>
+            <li>AI-navigability: 不再被转发层误导</li>
+          </ul>
+        </article>
+
+        <!-- Candidate 8: DataCollectionService Decomposition -->
+        <article id="c8-dcs" class="space-y-4">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-serif font-bold text-slate-800">拆解 DataCollectionService（53KB 上帝模块）</h2>
+            <span class="badge-worth text-xs px-2 py-0.5 rounded-full font-medium">Worth exploring</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">
+            utils/data_collection_service.py · utils/akshare_fetcher.py · utils/kline_updater.py · utils/fund_flow_updater.py
+          </p>
+
+          <div class="diagram-container">
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">Before</p>
+              <div class="border-2 border-slate-400 rounded-lg p-4">
+                <p class="module-label text-center mb-3">DataCollectionService (53KB)</p>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <div class="bg-slate-100 rounded p-2">状态管理 dict</div>
+                  <div class="bg-slate-100 rounded p-2">进度追踪</div>
+                  <div class="bg-slate-100 rounded p-2">线程管理</div>
+                  <div class="bg-slate-100 rounded p-2">暂停/恢复</div>
+                  <div class="bg-slate-100 rounded p-2">初始化逻辑</div>
+                  <div class="bg-slate-100 rounded p-2">增量更新</div>
+                  <div class="bg-slate-100 rounded p-2">数据验证</div>
+                  <div class="bg-slate-100 rounded p-2">错误处理</div>
+                </div>
+              </div>
+            </div>
+            <div class="diagram-side">
+              <p class="text-xs uppercase tracking-wider text-slate-400 mb-2">After</p>
+              <div class="space-y-2">
+                <div class="deep-box rounded p-3">
+                  <p class="module-label">DataUpdateOrchestrator</p>
+                  <p class="text-xs text-slate-400">编排 · 进度 · 状态</p>
+                </div>
+                <div class="flex gap-2">
+                  <div class="border border-slate-300 rounded p-2 flex-1">
+                    <p class="module-label">KlineUpdater</p>
+                  </div>
+                  <div class="border border-slate-300 rounded p-2 flex-1">
+                    <p class="module-label">FundFlowUpdater</p>
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <div class="border border-slate-300 rounded p-2 flex-1">
+                    <p class="module-label">NewStockDetector</p>
+                  </div>
+                  <div class="border border-slate-300 rounded p-2 flex-1">
+                    <p class="module-label">TradingTimeValidator</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Problem</p>
+              <p class="text-sm text-slate-600">DataCollectionService 是 53KB 的上帝模块，导入并协调 8+ 子模块。状态管理 dict 在方法间共享，无同步机制。理解任何数据流都需要在这个文件里跳转，然后再到 AKShareFetcher，然后再到具体子模块。</p>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">Solution</p>
+              <p class="text-sm text-slate-600">拆分为 DataUpdateOrchestrator（编排/进度/状态）+ 已有的子模块（KlineUpdater 等）。Orchestrator 成为深模块，接口简单，实现复杂。</p>
+            </div>
+          </div>
+
+          <ul class="wins-list text-sm text-slate-600 space-y-1">
+            <li>locality: 每个更新类型有自己的模块</li>
+            <li>leverage: Orchestrator 接口简洁，实现细节隐藏</li>
+            <li>测试: 每个子模块可独立测试</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <!-- Top Recommendation -->
+      <section id="top-recommendation" class="space-y-6">
+        <h2 class="text-2xl font-serif font-bold text-slate-800 border-t pt-8">Top Recommendation</h2>
+
+        <div class="border-2 border-emerald-500 rounded-lg p-6 bg-emerald-50/50 space-y-4">
+          <div class="flex items-center gap-3">
+            <h3 class="text-lg font-serif font-bold text-slate-800">先做 #1（死代码清理），再做 #2（统一卖出逻辑）</h3>
+          </div>
+          <p class="text-sm text-slate-600">
+            <strong>#1 是零风险的快速胜利</strong>：删除 5000+ 行从未执行的代码，立即改善代码库的可导航性。每个文件都通过了删除测试——删除后零运行时影响。这是后续所有重构的基础：清理死代码后，grep 和 IDE 跳转不再被误导。
+          </p>
+          <p class="text-sm text-slate-600">
+            <strong>#2 是最高价值的架构改进</strong>：BacktestEngine 和 StrategyRunner 的卖出逻辑已经漂移（不同成本模型），这意味着回测结果可能与实盘不一致。统一到 TradingCoreMixin 后，两个消费者共享一个接口，回测和实盘一致性得到保证。
+          </p>
+          <p class="text-sm text-slate-600">
+            <strong>#3（indicators/ 迁移）</strong>紧随其后，与 ADR-0001 一致，可以逐策略渐进迁移。
+          </p>
+        </div>
+      </section>
+
+    </main>
+  </body>
+</html>
