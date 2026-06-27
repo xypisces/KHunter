@@ -10,7 +10,7 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from .data_fetcher import DataFetcher
+from .data_fetcher import StockAnalyzerDataFetcher
 from .technical_analyzer import TechnicalAnalyzer
 from .fundamental_analyzer import FundamentalAnalyzer
 from .fund_flow_analyzer import FundFlowAnalyzer
@@ -23,7 +23,7 @@ class StockAnalyzer:
     
     def __init__(self):
         """初始化分析器"""
-        self.data_fetcher = DataFetcher()
+        self.data_fetcher = StockAnalyzerDataFetcher()
         self.technical_analyzer = TechnicalAnalyzer()
         self.fundamental_analyzer = FundamentalAnalyzer()
         self.fund_flow_analyzer = FundFlowAnalyzer()
@@ -44,12 +44,13 @@ class StockAnalyzer:
             # 1. 获取股票基本信息
             stock_info = self.data_fetcher.get_stock_basic(stock_code)
             
-            # 2. 获取历史行情数据
-            quote_data = self.data_fetcher.get_stock_quote(stock_code, period=period)
-            
-            # 3. 技术面分析（综合分析后转换为前端期望的格式）
-            raw_technical = self.technical_analyzer.comprehensive_technical_analysis(quote_data)
-            technical_result = self._convert_technical_result(raw_technical)
+            # 2. 获取历史行情数据（返回 DataFrame）
+            import pandas as pd
+            quote_dict = self.data_fetcher.get_stock_quote(stock_code)
+            quote_data = pd.DataFrame([quote_dict]) if quote_dict else pd.DataFrame()
+
+            # 3. 技术面分析（直接返回前端格式）
+            technical_result = self.technical_analyzer.comprehensive_technical_analysis(quote_data)
             
             # 4. 基本面分析
             fundamental_result = self.fundamental_analyzer.analyze(stock_code)
@@ -173,74 +174,8 @@ class StockAnalyzer:
             "risk": "；".join(risks)
         }
 
-    def _convert_technical_result(self, raw):
-        """将 comprehensive_technical_analysis 结果转换为前端期望的格式
 
-        前端期望: {trend, indicators: {MACD, KDJ, RSI, Bollinger}, patterns}
-        原始格式: {trend_analysis, volatility_analysis, momentum_analysis, volume_analysis, ...}
 
-        Args:
-            raw: comprehensive_technical_analysis 返回的原始结果
-
-        Returns:
-            dict: 前端期望格式的技术分析结果
-        """
-        # 提取趋势信息
-        trend_analysis = raw.get("trend_analysis", {})
-        raw_trend = trend_analysis.get("trend", "未知")
-
-        # 映射趋势名称：comprehensive 用"上升/下降"，前端用"上升趋势/下降趋势"
-        trend_map = {"上升": "上升趋势", "下降": "下降趋势", "震荡": "横盘"}
-        trend = trend_map.get(raw_trend, raw_trend)
-
-        # 从趋势强度推断 MACD 状态
-        strength = trend_analysis.get("strength", 0)
-        if raw_trend == "上升" and strength >= 3:
-            macd_status = "多头"
-        elif raw_trend == "上升":
-            macd_status = "金叉"
-        elif raw_trend == "下降" and strength >= 3:
-            macd_status = "空头"
-        elif raw_trend == "下降":
-            macd_status = "死叉"
-        else:
-            macd_status = "未知"
-
-        # 从动量分析中提取 RSI 水平，映射为 KDJ 状态
-        momentum = raw.get("momentum_analysis", {})
-        rsi_level = momentum.get("rsi_level", "中性")
-        kdj_map = {"超买": "超买", "超卖": "超卖", "中性": "中性"}
-        kdj_status = kdj_map.get(rsi_level, "中性")
-
-        # 波动率分析（布林带宽度判断通道状态）
-        volatility = raw.get("volatility_analysis", {})
-        bb_width = volatility.get("bb_width", 0)
-        vol_level = volatility.get("volatility_level", "低")
-        # 高波动率 + 宽布林带 → 可能突破
-        if vol_level == "高" and bb_width > 15:
-            bollinger_status = "突破上轨" if raw_trend == "上升" else "突破下轨"
-        else:
-            bollinger_status = "通道内"
-
-        # 技术评分转换为 RSI 数值（0-100 映射）
-        technical_score = raw.get("technical_score", 50)
-        rsi_value = float(technical_score)
-
-        return {
-            "trend": trend,
-            "indicators": {
-                "MACD": macd_status,
-                "KDJ": kdj_status,
-                "RSI": rsi_value,
-                "Bollinger": bollinger_status
-            },
-            "patterns": [],
-            # 保留原始详细数据
-            "technical_score": technical_score,
-            "technical_opinion": raw.get("technical_opinion", "中性")
-        }
-
-    
     def generate_report(self, stock_code, period='30d', format='html'):
         """生成分析报告
         

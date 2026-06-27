@@ -32,7 +32,7 @@ class TechnicalAnalyzer:
             return data
 
         for period in periods:
-            data[f'ma{period}'] = ma(data['close'], period)
+            data[f'ma{period}'] = ma(data['close'], period)  # type: ignore[arg-type]
         return data
     
     def calculate_macd(self, data: pd.DataFrame, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9) -> pd.DataFrame:
@@ -324,74 +324,121 @@ class TechnicalAnalyzer:
         }
     
     def comprehensive_technical_analysis(self, data: pd.DataFrame) -> Dict[str, Any]:
-        """综合技术分析
-        
+        """综合技术分析 - 直接返回前端期望格式
+
         Args:
             data: 历史行情数据
-            
+
         Returns:
-            dict: 综合技术分析结果
+            dict: 前端期望格式 {trend, indicators, patterns, score, opinion}
         """
         if data is None or data.empty:
             return {
-                "trend_analysis": self.analyze_trend(data),
-                "volatility_analysis": self.analyze_volatility(data),
-                "momentum_analysis": self.analyze_momentum(data),
-                "volume_analysis": self.analyze_volume(data),
-                "technical_score": 0,
-                "technical_opinion": "数据不足"
+                "trend": "未知",
+                "indicators": {"MACD": "未知", "KDJ": "未知", "RSI": 50.0, "Bollinger": "未知"},
+                "patterns": [],
+                "score": 0,
+                "opinion": "数据不足"
             }
-        
-        # 分析各个维度
-        trend_analysis = self.analyze_trend(data)
-        volatility_analysis = self.analyze_volatility(data)
-        momentum_analysis = self.analyze_momentum(data)
-        volume_analysis = self.analyze_volume(data)
-        
-        # 计算技术分析评分（0-100）
-        technical_score = 50  # 基础分
-        
-        # 趋势评分
-        if trend_analysis['trend'] == "上升":
-            technical_score += 20
-        elif trend_analysis['trend'] == "下降":
-            technical_score -= 20
-        
-        # 动量评分
-        if momentum_analysis['momentum_strength'] == "强" and momentum_analysis['momentum'] > 0:
-            technical_score += 15
-        elif momentum_analysis['momentum_strength'] == "强" and momentum_analysis['momentum'] < 0:
-            technical_score -= 15
-        
-        # RSI评分
-        if momentum_analysis['rsi_level'] == "超买":
-            technical_score -= 10
-        elif momentum_analysis['rsi_level'] == "超卖":
-            technical_score += 10
-        
-        # 成交量评分
-        if volume_analysis['volume_trend'] == "增加":
-            technical_score += 10
-        elif volume_analysis['volume_trend'] == "减少":
-            technical_score -= 10
-        
-        # 确保评分在0-100之间
-        technical_score = max(0, min(100, technical_score))
-        
-        # 生成技术分析意见
-        technical_opinion = "中性"
-        if technical_score >= 70:
-            technical_opinion = "看多"
-        elif technical_score <= 30:
-            technical_opinion = "看空"
-        
+
+        # 计算指标
+        data = self.calculate_ma(data, [5, 20])
+        data = self.calculate_macd(data)
+        data = self.calculate_rsi(data)
+        data = self.calculate_kdj(data)
+        data = self.calculate_bollinger_bands(data)
+
+        # 趋势判断
+        trend = "横盘"
+        if 'ma5' in data.columns and 'ma20' in data.columns:
+            latest = data.iloc[-1]
+            if latest['ma5'] > latest['ma20']:
+                trend = "上升趋势"
+            elif latest['ma5'] < latest['ma20']:
+                trend = "下降趋势"
+
+        # MACD 状态
+        macd_status = "未知"
+        if 'macd' in data.columns and 'signal' in data.columns:
+            latest = data.iloc[-1]
+            if latest['macd'] > latest['signal'] and latest['macd'] > 0:
+                macd_status = "多头"
+            elif latest['macd'] < latest['signal'] and latest['macd'] < 0:
+                macd_status = "空头"
+            elif latest['macd'] > latest['signal']:
+                macd_status = "金叉"
+            else:
+                macd_status = "死叉"
+
+        # KDJ 状态
+        kdj_status = "未知"
+        if 'k' in data.columns and 'd' in data.columns:
+            latest = data.iloc[-1]
+            if latest['k'] > 80 and latest['d'] > 80:
+                kdj_status = "超买"
+            elif latest['k'] < 20 and latest['d'] < 20:
+                kdj_status = "超卖"
+            elif latest['k'] > latest['d']:
+                kdj_status = "金叉"
+            else:
+                kdj_status = "死叉"
+
+        # RSI 值
+        rsi_value = 50.0
+        if 'rsi' in data.columns:
+            rsi_value = float(data['rsi'].iloc[-1])
+
+        # 布林带状态
+        bollinger_status = "正常"
+        if 'bb_upper' in data.columns and 'bb_lower' in data.columns:
+            latest = data.iloc[-1]
+            if latest['close'] > latest['bb_upper']:
+                bollinger_status = "突破上轨"
+            elif latest['close'] < latest['bb_lower']:
+                bollinger_status = "突破下轨"
+
+        # 计算综合评分
+        score = 50
+        if trend == "上升趋势":
+            score += 20
+        elif trend == "下降趋势":
+            score -= 20
+
+        if macd_status in ("多头", "金叉"):
+            score += 10
+        elif macd_status in ("空头", "死叉"):
+            score -= 10
+
+        if kdj_status == "超卖":
+            score += 10
+        elif kdj_status == "超买":
+            score -= 10
+
+        if rsi_value < 30:
+            score += 10
+        elif rsi_value > 70:
+            score -= 10
+
+        score = max(0, min(100, score))
+
+        # 生成意见
+        opinion = "中性"
+        if score >= 70:
+            opinion = "看多"
+        elif score <= 30:
+            opinion = "看空"
+
         return {
-            "trend_analysis": trend_analysis,
-            "volatility_analysis": volatility_analysis,
-            "momentum_analysis": momentum_analysis,
-            "volume_analysis": volume_analysis,
-            "technical_score": technical_score,
-            "technical_opinion": technical_opinion
+            "trend": trend,
+            "indicators": {
+                "MACD": macd_status,
+                "KDJ": kdj_status,
+                "RSI": rsi_value,
+                "Bollinger": bollinger_status
+            },
+            "patterns": [],
+            "score": score,
+            "opinion": opinion
         }
 
 
@@ -399,24 +446,24 @@ if __name__ == "__main__":
     # 测试技术分析器
     import sys
     from pathlib import Path
-    
+
     # 添加项目根目录到路径
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from stock_analyzer.data_fetcher import DataFetcher
-    
+    from stock_analyzer.data_fetcher import StockAnalyzerDataFetcher
+    import pandas as pd
+
     # 获取测试数据
-    fetcher = DataFetcher()
-    data = fetcher.get_stock_quote("600519", period="30d")
-    
+    fetcher = StockAnalyzerDataFetcher()
+    quote_dict = fetcher.get_stock_quote("600519")
+    data = pd.DataFrame([quote_dict]) if quote_dict else pd.DataFrame()
+
     # 初始化技术分析器
     analyzer = TechnicalAnalyzer()
-    
+
     # 测试综合技术分析
     result = analyzer.comprehensive_technical_analysis(data)
     print("综合技术分析结果:")
-    print(f"趋势分析: {result['trend_analysis']}")
-    print(f"波动率分析: {result['volatility_analysis']}")
-    print(f"动量分析: {result['momentum_analysis']}")
-    print(f"成交量分析: {result['volume_analysis']}")
-    print(f"技术评分: {result['technical_score']}")
-    print(f"技术意见: {result['technical_opinion']}")
+    print(f"趋势: {result['trend']}")
+    print(f"指标: {result['indicators']}")
+    print(f"评分: {result['score']}")
+    print(f"意见: {result['opinion']}")
