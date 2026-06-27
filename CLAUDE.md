@@ -91,6 +91,26 @@ akshare API → utils/数据获取 → SQLite (data/stock_selection.db)
 - 函数必须有 docstring，说明参数和返回值
 - Commit message 格式：`<type>(<scope>): <subject>`（feat/fix/docs/refactor/perf/test/chore）
 
+## Lint 审查规则
+
+**每个提交的 Python 文件都必须经过 Pyright 类型检查审查。**
+
+```bash
+# 检查单个文件
+uv run pyright <file_path>
+
+# 检查多个文件
+uv run pyright file1.py file2.py file3.py
+```
+
+- 提交前必须对所有修改的 `.py` 文件运行 `uv run pyright`，确保 0 errors
+- 常见修复模式：
+  - `param: str = None` → `param: Optional[str] = None`
+  - `return None` 与返回类型不匹配 → 改为 `Optional[返回类型]`
+  - 变量可能未绑定 → 在使用前初始化默认值
+  - 第三方库无类型存根 → `import xxx  # type: ignore[import-untyped]`
+  - `date` 对象传入 `str` 参数 → 使用 `.strftime('%Y-%m-%d')` 转换
+
 ## 配置文件
 
 - `config/config.yaml` - 主配置（从 `config.yaml.template` 复制）

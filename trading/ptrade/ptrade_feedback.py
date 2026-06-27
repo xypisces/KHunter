@@ -51,7 +51,7 @@ class PTradeFeedbackHandler:
       3. 模块级默认常量
     """
 
-    def __init__(self, project_root: str = None, config: Dict = None):
+    def __init__(self, project_root: Optional[str] = None, config: Optional[Dict] = None):
         """初始化反馈处理器
 
         Args:
@@ -444,8 +444,8 @@ class PTradeFeedbackHandler:
 
 def process_ptrade_feedback(
         feedback_date: str,
-        project_root: str = None,
-        config: Dict = None) -> Dict:
+        project_root: Optional[str] = None,
+        config: Optional[Dict] = None) -> Dict:
     """便捷函数：处理 PTrade 反馈文件
 
     Args:
@@ -462,8 +462,8 @@ def process_ptrade_feedback(
 
 def get_pending_feedback_date(
         last_feedback_date: Optional[str],
-        project_root: str = None,
-        config: Dict = None) -> Optional[str]:
+        project_root: Optional[str] = None,
+        config: Optional[Dict] = None) -> Optional[str]:
     """获取待处理的 PTrade 反馈日期
 
     与 last_feedback_date 对比，返回更新的交易日日期供处理。
