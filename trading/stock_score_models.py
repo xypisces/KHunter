@@ -554,9 +554,9 @@ class StockScore:
     整合技术面、资金面、基本面、板块强度和事件驱动五个维度的评分，
     计算综合得分并判断评分等级。支持一票否决机制。
 
-    综合得分计算公式：
-        total = technical × 0.25 + moneyflow × 0.30 + fundamental × 0.15
-                + sector × 0.15 + event × 0.15
+    综合得分计算公式（权重定义见 SCORE_WEIGHTS）：
+        total = technical × 0.35 + moneyflow × 0.35 + fundamental × 0.10
+                + sector × 0.10 + event × 0.10
     """
 
     def __init__(
@@ -604,9 +604,9 @@ class StockScore:
         """
         根据各维度得分和权重计算综合得分
 
-        计算公式：
-            total = technical × 0.25 + moneyflow × 0.30 + fundamental × 0.15
-                    + sector × 0.15 + event × 0.15
+        计算公式（权重定义见 SCORE_WEIGHTS）：
+            total = technical × 0.35 + moneyflow × 0.35 + fundamental × 0.10
+                    + sector × 0.10 + event × 0.10
 
         如果触发一票否决，综合得分直接为 -100。
 

@@ -224,14 +224,14 @@ class BacktestScoreCalculator:
             return score_obj, veto
         
         # ============================================================
-        # 第六步：计算综合得分
+        # 第六步：计算综合得分（权重统一从 SCORE_WEIGHTS 导入）
         # ============================================================
         total_score = (
-            score_obj.technical_score * 0.35  # 技术面权重 35%
-            + score_obj.moneyflow_score * 0.35  # 资金面权重 35%
-            + score_obj.fundamental_score * 0.10  # 基本面权重 10%
-            + score_obj.sector_score * 0.10  # 板块权重 10%
-            + score_obj.event_score * 0.10  # 事件权重 10%
+            score_obj.technical_score * SCORE_WEIGHTS["technical"]
+            + score_obj.moneyflow_score * SCORE_WEIGHTS["moneyflow"]
+            + score_obj.fundamental_score * SCORE_WEIGHTS["fundamental"]
+            + score_obj.sector_score * SCORE_WEIGHTS["sector"]
+            + score_obj.event_score * SCORE_WEIGHTS["event"]
         )
         
         # 限制范围

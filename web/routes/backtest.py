@@ -2,6 +2,8 @@
 回测路由 - /api/trading/backtest/*
 从 trading/routes.py 拆分
 """
+import datetime
+import json
 from typing import Any
 from flask import Blueprint, request, jsonify
 from web.deps import get_db_manager, get_akshare_fetcher
@@ -390,3 +392,359 @@ def get_backtest_strategies() -> Any:
     except Exception as e:
         logger.error(f"获取回测策略失败: {str(e)}")
         return jsonify({"success": False, "error": str(e)})
+
+
+# ==================== 执行方案管理接口 ====================
+
+
+@backtest_bp.route("/execution/plans", methods=["GET"])
+def get_execution_plans() -> Any:
+    """获取所有执行方案列表"""
+    try:
+        from trading.strategy_execution_plan import ExecutionPlan
+
+        plans = ExecutionPlan.list_plans()
+
+        plan_list = []
+        for plan in plans:
+            plan_list.append({
+                "id": plan.id,
+                "name": plan.name,
+                "description": plan.description,
+                "combination_count": len(plan.combinations),
+                "config_ref": plan.config_ref,
+                "created_at": plan.created_at,
+                "updated_at": plan.updated_at,
+            })
+
+        return jsonify({
+            "success": True,
+            "message": "获取执行方案列表成功",
+            "data": {"plans": plan_list, "total_count": len(plan_list)},
+        }), 200
+
+    except Exception as e:
+        logger.error(f"获取执行方案列表失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"获取执行方案列表失败: {str(e)}",
+            "data": None,
+        }), 500
+
+
+@backtest_bp.route("/execution/plans/<plan_id>", methods=["GET"])
+def get_execution_plan(plan_id: str) -> Any:
+    """获取单个执行方案详情"""
+    try:
+        from trading.strategy_execution_plan import ExecutionPlan
+
+        plan = ExecutionPlan.load(plan_id)
+
+        if not plan:
+            return jsonify({
+                "success": False,
+                "message": "方案不存在",
+                "data": None,
+            }), 404
+
+        combinations = []
+        for combo in plan.combinations:
+            combinations.append({
+                "id": combo.id,
+                "selection_strategy": combo.selection_strategy,
+                "timing_strategy": combo.timing_strategy,
+                "enabled": combo.enabled,
+            })
+
+        return jsonify({
+            "success": True,
+            "message": "获取执行方案详情成功",
+            "data": {
+                "id": plan.id,
+                "name": plan.name,
+                "description": plan.description,
+                "combinations": combinations,
+                "config_ref": plan.config_ref,
+                "created_at": plan.created_at,
+                "updated_at": plan.updated_at,
+            },
+        }), 200
+
+    except FileNotFoundError:
+        return jsonify({
+            "success": False,
+            "message": "方案不存在",
+            "data": None,
+        }), 404
+    except Exception as e:
+        logger.error(f"获取执行方案详情失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"获取执行方案详情失败: {str(e)}",
+            "data": None,
+        }), 500
+
+
+@backtest_bp.route("/execution/plans", methods=["POST"])
+def create_execution_plan() -> Any:
+    """创建执行方案"""
+    try:
+        from trading.strategy_execution_plan import ExecutionPlan, StrategyCombination
+
+        data = request.get_json() or {}
+
+        if "name" not in data or not data["name"]:
+            return jsonify({
+                "success": False,
+                "message": "方案名称不能为空",
+                "data": None,
+            }), 400
+
+        plan = ExecutionPlan(
+            name=data["name"],
+            description=data.get("description", ""),
+        )
+
+        plan.config_ref = data.get("config_ref", "default")
+
+        combinations = data.get("combinations", [])
+        for combo_data in combinations:
+            combo = StrategyCombination(
+                selection_strategy=combo_data.get("selection_strategy", ""),
+                timing_strategy=combo_data.get("timing_strategy", ""),
+                enabled=combo_data.get("enabled", True),
+            )
+            plan.add_combination(combo)
+
+        if not plan.validate():
+            return jsonify({
+                "success": False,
+                "message": "方案验证失败，请确保至少包含一个有效的策略组合",
+                "data": None,
+            }), 400
+
+        plan.save()
+
+        return jsonify({
+            "success": True,
+            "message": "创建执行方案成功",
+            "data": {"plan_id": plan.id},
+        }), 201
+
+    except ValueError as e:
+        return jsonify({
+            "success": False,
+            "message": str(e),
+            "data": None,
+        }), 400
+    except Exception as e:
+        logger.error(f"创建执行方案失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"创建执行方案失败: {str(e)}",
+            "data": None,
+        }), 500
+
+
+@backtest_bp.route("/execution/plans/<plan_id>", methods=["PUT"])
+def update_execution_plan(plan_id: str) -> Any:
+    """更新执行方案"""
+    try:
+        from trading.strategy_execution_plan import ExecutionPlan, StrategyCombination
+
+        data = request.get_json() or {}
+
+        plan = ExecutionPlan.load(plan_id)
+
+        if not plan:
+            return jsonify({
+                "success": False,
+                "message": "方案不存在",
+                "data": None,
+            }), 404
+
+        if "name" in data:
+            plan.name = data["name"]
+        if "description" in data:
+            plan.description = data["description"]
+        if "config_ref" in data:
+            plan.config_ref = data["config_ref"]
+
+        if "combinations" in data:
+            plan.combinations = []
+            for combo_data in data["combinations"]:
+                combo = StrategyCombination(
+                    combination_id=combo_data.get("id"),
+                    selection_strategy=combo_data.get("selection_strategy", ""),
+                    timing_strategy=combo_data.get("timing_strategy", ""),
+                    enabled=combo_data.get("enabled", True),
+                )
+                plan.add_combination(combo)
+
+        if not plan.validate():
+            return jsonify({
+                "success": False,
+                "message": "方案验证失败",
+                "data": None,
+            }), 400
+
+        plan.save()
+
+        return jsonify({
+            "success": True,
+            "message": "更新执行方案成功",
+            "data": {"plan_id": plan.id},
+        }), 200
+
+    except FileNotFoundError:
+        return jsonify({
+            "success": False,
+            "message": "方案不存在",
+            "data": None,
+        }), 404
+    except ValueError as e:
+        return jsonify({
+            "success": False,
+            "message": str(e),
+            "data": None,
+        }), 400
+    except Exception as e:
+        logger.error(f"更新执行方案失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"更新执行方案失败: {str(e)}",
+            "data": None,
+        }), 500
+
+
+@backtest_bp.route("/execution/plans/<plan_id>", methods=["DELETE"])
+def delete_execution_plan(plan_id: str) -> Any:
+    """删除执行方案"""
+    try:
+        from trading.strategy_execution_plan import ExecutionPlan
+
+        plan = ExecutionPlan.load(plan_id)
+
+        if not plan:
+            return jsonify({
+                "success": False,
+                "message": "方案不存在",
+                "data": None,
+            }), 404
+
+        plan.delete()
+
+        return jsonify({
+            "success": True,
+            "message": "删除执行方案成功",
+            "data": {"plan_id": plan_id},
+        }), 200
+
+    except FileNotFoundError:
+        return jsonify({
+            "success": False,
+            "message": "方案不存在",
+            "data": None,
+        }), 404
+    except Exception as e:
+        logger.error(f"删除执行方案失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"删除执行方案失败: {str(e)}",
+            "data": None,
+        }), 500
+
+
+@backtest_bp.route("/execution/plans/import", methods=["POST"])
+def import_execution_plan() -> Any:
+    """导入执行方案"""
+    try:
+        from uuid import uuid4
+        from trading.strategy_execution_plan import ExecutionPlan
+
+        data = request.get_json() or {}
+        plan_data = data.get("plan_data")
+
+        if not plan_data:
+            return jsonify({
+                "success": False,
+                "message": "缺少方案数据",
+                "data": None,
+            }), 400
+
+        plan = ExecutionPlan.from_dict(plan_data)
+
+        plan.id = str(uuid4())
+        plan.created_at = datetime.datetime.now().isoformat()
+        plan.updated_at = datetime.datetime.now().isoformat()
+
+        if not plan.validate():
+            return jsonify({
+                "success": False,
+                "message": "方案验证失败",
+                "data": None,
+            }), 400
+
+        plan.save()
+
+        return jsonify({
+            "success": True,
+            "message": "导入执行方案成功",
+            "data": {"plan_id": plan.id},
+        }), 201
+
+    except ValueError as e:
+        return jsonify({
+            "success": False,
+            "message": str(e),
+            "data": None,
+        }), 400
+    except Exception as e:
+        logger.error(f"导入执行方案失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"导入执行方案失败: {str(e)}",
+            "data": None,
+        }), 500
+
+
+@backtest_bp.route("/execution/plans/<plan_id>/export", methods=["GET"])
+def export_execution_plan(plan_id: str) -> Any:
+    """导出执行方案"""
+    try:
+        from flask import make_response
+        from urllib.parse import quote
+        from trading.strategy_execution_plan import ExecutionPlan
+
+        plan = ExecutionPlan.load(plan_id)
+
+        if not plan:
+            return jsonify({
+                "success": False,
+                "message": "方案不存在",
+                "data": None,
+            }), 404
+
+        plan_dict = plan.to_dict()
+
+        response = make_response(json.dumps(plan_dict, ensure_ascii=False, indent=2))
+        response.headers["Content-Type"] = "application/json"
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename="{quote(f"{plan.name}.json")}"'
+        )
+
+        return response
+
+    except FileNotFoundError:
+        return jsonify({
+            "success": False,
+            "message": "方案不存在",
+            "data": None,
+        }), 404
+    except Exception as e:
+        logger.error(f"导出执行方案失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"导出执行方案失败: {str(e)}",
+            "data": None,
+        }), 500
