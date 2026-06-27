@@ -20,13 +20,12 @@ import logging
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime, timedelta
 
-from trading.stock_score_models import (
-    StockScore, SCORE_WEIGHTS, VETO_SCORE, STRATEGY_CLASS_NAME_MAP
-)
+from trading.stock_score_models import StockScore, SCORE_WEIGHTS, VETO_SCORE
 from trading.technical_scorer import (
     STRATEGY_WEIGHTS, VETO_STRATEGIES as TECH_VETO_STRATEGIES,
     VETO_ENABLED as TECH_VETO_ENABLED
 )
+from utils.strategy_name_mapper import get_chinese_name
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -277,46 +276,41 @@ class BacktestScoreCalculator:
         score_obj.veto_reason = veto.reason
     
     def _calculate_technical_score(
-        self, 
-        stock_code: str, 
-        score_date: str, 
+        self,
+        stock_code: str,
+        score_date: str,
         hit_strategies: List[str],
         score_obj: StockScore
     ) -> VetoResult:
         """
         计算技术面得分 + 否决检查
-        
+
         否决条件：M头策略 + 多死叉共振策略同时命中
         """
         try:
-            # 直接计算技术面评分：根据命中策略的权重求和
+            # 计算技术面评分：将英文类名转为中文名称后匹配权重
             total_weight = 0.0
             for strategy in hit_strategies:
-                # 尝试直接匹配策略名称
+                # 先尝试直接匹配，再尝试通过 get_chinese_name 转换
                 weight = STRATEGY_WEIGHTS.get(strategy, 0)
-                # 如果直接匹配失败，尝试添加策略后缀
-                if weight == 0 and not strategy.endswith('策略'):
-                    name_with_suffix = strategy + '策略'
-                    weight = STRATEGY_WEIGHTS.get(name_with_suffix, 0)
-                # 如果仍然失败，尝试去掉策略后缀
-                if weight == 0 and strategy.endswith('策略'):
-                    name_without_suffix = strategy[:-2]
-                    weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
+                if weight == 0:
+                    chinese_name = get_chinese_name(strategy)
+                    if chinese_name != strategy:
+                        weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                 total_weight += weight
-            
+
             score_obj.technical_score = total_weight
             logger.debug(f"股票 {stock_code} 技术面评分: {total_weight}, 命中策略: {hit_strategies}")
-            
+
             # 检查一票否决
             if TECH_VETO_ENABLED and hit_strategies:
-                # 检查是否同时命中M头策略和多死叉共振策略
                 hit_mtop = any('M头' in s or 'MTop' in s for s in hit_strategies)
                 hit_multi_death_cross = any('多死叉' in s or 'MultiDeathCross' in s for s in hit_strategies)
                 if hit_mtop and hit_multi_death_cross:
                     reason = "技术面一票否决：同时命中 M头策略 和 多死叉共振策略"
                     logger.debug(f"股票 {stock_code} {reason}")
                     return VetoResult(vetoed=True, dimension="技术面", reason=reason)
-            
+
             return VetoResult()
         except Exception as e:
             logger.debug(f"计算技术面评分失败: {e}")
@@ -470,21 +464,12 @@ class BacktestScoreCalculator:
                     strategy_weight = 0
                     for s in hit_strategies:
                         weight = STRATEGY_WEIGHTS.get(s, 0)
-                        # 如果直接匹配失败，尝试添加策略后缀
-                        if weight == 0 and not s.endswith('策略'):
-                            name_with_suffix = s + '策略'
-                            weight = STRATEGY_WEIGHTS.get(name_with_suffix, 0)
-                        # 如果仍然失败，尝试去掉策略后缀
-                        if weight == 0 and s.endswith('策略'):
-                            name_without_suffix = s[:-2]
-                            weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
-                        # 如果仍然失败，尝试使用类名映射
                         if weight == 0:
-                            chinese_name = STRATEGY_CLASS_NAME_MAP.get(s, '')
-                            if chinese_name:
+                            chinese_name = get_chinese_name(s)
+                            if chinese_name != s:
                                 weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                         strategy_weight += weight
-                    
+
                     # 综合评分 = 技术面评分（策略权重）
                     stock['score'] = strategy_weight
                     stock['technical_score'] = strategy_weight
@@ -500,13 +485,9 @@ class BacktestScoreCalculator:
                     stock['strategy_details'] = []
                     for s in hit_strategies:
                         weight = STRATEGY_WEIGHTS.get(s, 0)
-                        if weight == 0 and not s.endswith('策略'):
-                            weight = STRATEGY_WEIGHTS.get(s + '策略', 0)
-                        if weight == 0 and s.endswith('策略'):
-                            weight = STRATEGY_WEIGHTS.get(s[:-2], 0)
                         if weight == 0:
-                            chinese_name = STRATEGY_CLASS_NAME_MAP.get(s, '')
-                            if chinese_name:
+                            chinese_name = get_chinese_name(s)
+                            if chinese_name != s:
                                 weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                         stock['strategy_details'].append({'name': s, 'weight': weight})
                     stock['total_strategy_weight'] = strategy_weight
@@ -535,23 +516,17 @@ class BacktestScoreCalculator:
                 strategy_weight = 0
                 for s in hit_strategies:
                     weight = STRATEGY_WEIGHTS.get(s, 0)
-                    if weight == 0 and not s.endswith('策略'):
-                        name_with_suffix = s + '策略'
-                        weight = STRATEGY_WEIGHTS.get(name_with_suffix, 0)
-                    if weight == 0 and s.endswith('策略'):
-                        name_without_suffix = s[:-2]
-                        weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
+                    if weight == 0:
+                        chinese_name = get_chinese_name(s)
+                        if chinese_name != s:
+                            weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                     strategy_weight += weight
                 stock['strategy_details'] = []
                 for s in hit_strategies:
                     weight = STRATEGY_WEIGHTS.get(s, 0)
-                    if weight == 0 and not s.endswith('策略'):
-                        weight = STRATEGY_WEIGHTS.get(s + '策略', 0)
-                    if weight == 0 and s.endswith('策略'):
-                        weight = STRATEGY_WEIGHTS.get(s[:-2], 0)
                     if weight == 0:
-                        chinese_name = STRATEGY_CLASS_NAME_MAP.get(s, '')
-                        if chinese_name:
+                        chinese_name = get_chinese_name(s)
+                        if chinese_name != s:
                             weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                     stock['strategy_details'].append({'name': s, 'weight': weight})
                 stock['total_strategy_weight'] = strategy_weight

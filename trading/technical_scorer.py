@@ -15,8 +15,8 @@ from typing import Dict, List, Tuple
 
 # 导入数据库管理器
 from utils.db_manager import DBManager
-# 导入技术面详情模型和策略类名映射
-from trading.stock_score_models import TechnicalDetail, STRATEGY_CLASS_NAME_MAP
+# 导入技术面详情模型
+from trading.stock_score_models import TechnicalDetail
 
 # 配置日志记录器
 logger = logging.getLogger(__name__)
@@ -322,36 +322,15 @@ class TechnicalScorer:
             # 构建策略详情列表
             strategy_list = []
             total_score = 0.0
-            
-            # 使用全局策略类名到中文名称的映射
-            class_name_map = STRATEGY_CLASS_NAME_MAP
-            
-            # 构建策略名称映射列表，用于一票否决检查
-            mapped_strategies = []
-            
+
             for strategy in individual_strategies:
-                # 直接使用策略名称（已经是中文名称）
-                # 尝试直接匹配策略名称
+                # 直接匹配策略权重（STRATEGY_WEIGHTS 使用 display_name 作为 key）
                 weight = STRATEGY_WEIGHTS.get(strategy, 0)
-                # 如果直接匹配失败，尝试添加策略后缀
-                if weight == 0 and not strategy.endswith('策略'):
-                    name_with_suffix = strategy + '策略'
-                    weight = STRATEGY_WEIGHTS.get(name_with_suffix, 0)
-                # 如果仍然失败，尝试去掉策略后缀
-                if weight == 0 and strategy.endswith('策略'):
-                    name_without_suffix = strategy[:-2]
-                    weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
-                # 记录策略匹配过程
-                logger.info(f"策略: {strategy}, 直接匹配权重: {STRATEGY_WEIGHTS.get(strategy, 0)}, 添加后缀后权重: {STRATEGY_WEIGHTS.get(strategy + '策略', 0) if not strategy.endswith('策略') else 0}, 去掉后缀后权重: {STRATEGY_WEIGHTS.get(strategy[:-2], 0) if strategy.endswith('策略') else 0}, 最终权重: {weight}")
-                # 添加到映射策略列表
-                mapped_strategies.append(strategy)
-                # 构建策略详情
                 strategy_list.append({"name": strategy, "weight": weight})
-                
                 total_score += weight
             
-            # 检查一票否决，使用映射后的策略名称
-            veto, veto_reason = self.check_veto(stock_code, formatted_date, mapped_strategies)
+            # 检查一票否决
+            veto, veto_reason = self.check_veto(stock_code, formatted_date, individual_strategies)
             
             # 设置详情
             detail.strategies = strategy_list
@@ -396,17 +375,8 @@ class TechnicalScorer:
                 total_score = 0.0
                 
                 for strategy in individual_strategies:
-                    # 尝试直接匹配策略名称
+                    # 直接匹配策略权重
                     weight = STRATEGY_WEIGHTS.get(strategy, 0)
-                    # 如果直接匹配失败，尝试去掉策略后缀
-                    if weight == 0 and strategy.endswith('策略'):
-                        name_without_suffix = strategy[:-2]
-                        weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
-                    # 如果仍然失败，尝试使用策略类名映射
-                    if weight == 0:
-                        if strategy in STRATEGY_CLASS_NAME_MAP:
-                            chinese_name = STRATEGY_CLASS_NAME_MAP[strategy]
-                            weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                     total_score += weight
                     strategy_list.append({"name": strategy, "weight": weight})
                 
@@ -461,51 +431,16 @@ class TechnicalScorer:
                         total_score += weight
                         strategy_list.append({"name": name, "weight": weight})
                     elif isinstance(strategy, str):
-                        # 尝试直接匹配策略名称
+                        # 直接匹配策略权重
                         weight = STRATEGY_WEIGHTS.get(strategy, 0)
-                        # 如果直接匹配失败，尝试去掉策略后缀
-                        if weight == 0 and strategy.endswith('策略'):
-                            name_without_suffix = strategy[:-2]
-                            weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
-                        # 如果仍然失败，尝试使用策略类名映射
-                        if weight == 0:
-                            if strategy in STRATEGY_CLASS_NAME_MAP:
-                                chinese_name = STRATEGY_CLASS_NAME_MAP[strategy]
-                                weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                         total_score += weight
                         strategy_list.append({"name": strategy, "weight": weight})
             elif isinstance(strategies_data, str):
                 # 字符串格式，按逗号分割
                 strategy_names = [s.strip() for s in strategies_data.split(',') if s.strip()]
                 for name in strategy_names:
-                    # 尝试直接匹配策略名称
+                    # 直接匹配策略权重
                     weight = STRATEGY_WEIGHTS.get(name, 0)
-                    # 如果直接匹配失败，尝试去掉策略后缀
-                    if weight == 0 and name.endswith('策略'):
-                        name_without_suffix = name[:-2]
-                        weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
-                    # 如果仍然失败，尝试使用策略类名映射
-                    if weight == 0:
-                        # 完整的策略类名到中文名称的映射
-                        class_name_map = {
-                            'BottomTrendInflectionStrategy': '底部趋势拐点',
-                            'TrendAccelerationInflectionStrategy': '趋势加速拐点',
-                            'TrendResonanceReversalStrategy': '趋势共振反转策略',
-                            'ResistanceBreakoutStrategy': '阻力位突破策略',
-                            'WBottomStrategy': 'W底策略',
-                            'MultiGoldenCrossStrategy': '多金叉共振策略',
-                            'MorningStarStrategy': '启明星策略',
-                            'MultiPartyCannonStrategy': '多方炮策略',
-                            'MultiDeathCrossStrategy': '多死叉共振策略',
-                            'MTopStrategy': 'M头策略',
-                            'StrongWashWeakToStrongStrategy': '强势洗盘弱转强策略',
-                            'LimitUpPullbackStrategy': '涨停回马枪策略',
-                            'LimitUpSidewaysStrategy': '涨停横盘策略',
-                            'GoldenTriangleStrategy': '金三角策略'
-                        }
-                        if name in class_name_map:
-                            chinese_name = class_name_map[name]
-                            weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                     total_score += weight
                     strategy_list.append({"name": name, "weight": weight})
             
@@ -521,17 +456,8 @@ class TechnicalScorer:
                     total_score = 0.0
                     
                     for strategy in individual_strategies:
-                        # 尝试直接匹配策略名称
+                        # 直接匹配策略权重
                         weight = STRATEGY_WEIGHTS.get(strategy, 0)
-                        # 如果直接匹配失败，尝试去掉策略后缀
-                        if weight == 0 and strategy.endswith('策略'):
-                            name_without_suffix = strategy[:-2]
-                            weight = STRATEGY_WEIGHTS.get(name_without_suffix, 0)
-                        # 如果仍然失败，尝试使用策略类名映射
-                        if weight == 0:
-                            if strategy in STRATEGY_CLASS_NAME_MAP:
-                                chinese_name = STRATEGY_CLASS_NAME_MAP[strategy]
-                                weight = STRATEGY_WEIGHTS.get(chinese_name, 0)
                         total_score += weight
                         strategy_list.append({"name": strategy, "weight": weight})
                     

@@ -3,100 +3,86 @@
 """
 策略名称映射工具
 
-将策略的英文类名转换为中文名称，反之亦然
-支持从配置文件加载映射表
+将策略的英文类名转换为中文名称，反之亦然。
+唯一真相源：config/strategy_params.yaml 的 display_name 字段。
 """
 
 import yaml
 from pathlib import Path
 
 # 配置文件路径
-CONFIG_FILE = Path(__file__).parent.parent / "config" / "strategy_name_mapping.yaml"
+_PARAMS_FILE = Path(__file__).parent.parent / "config" / "strategy_params.yaml"
+_MAPPING_FILE = Path(__file__).parent.parent / "config" / "strategy_name_mapping.yaml"
 
 # 缓存映射表
-_STRATEGY_NAME_MAP = None
-_STRATEGY_NAME_REVERSE_MAP = None
+_STRATEGY_NAME_MAP: dict[str, str] | None = None
+_STRATEGY_NAME_REVERSE_MAP: dict[str, str] | None = None
 
 
-def _load_mapping_from_config():
+def _load_mapping_from_params() -> tuple[dict[str, str], dict[str, str]]:
     """
-    从配置文件加载策略名称映射
-    
+    从 strategy_params.yaml 的 display_name 自动提取映射。
+
+    Returns:
+        tuple: (正向映射表: 英文类名→中文名称, 反向映射表: 中文名称→英文类名)
+    """
+    try:
+        if _PARAMS_FILE.exists():
+            with open(_PARAMS_FILE, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+
+            strategies = config.get("strategies", {})
+            mapping: dict[str, str] = {}
+            for class_name, cfg in strategies.items():
+                display_name = cfg.get("display_name") if isinstance(cfg, dict) else None
+                if display_name:
+                    mapping[class_name] = display_name
+
+            if mapping:
+                reverse_mapping = {v: k for k, v in mapping.items()}
+                return mapping, reverse_mapping
+    except Exception as e:
+        print(f"警告: 无法从 strategy_params.yaml 加载策略名称映射: {e}")
+
+    # 降级：尝试从 strategy_name_mapping.yaml 加载
+    return _load_mapping_from_mapping_file()
+
+
+def _load_mapping_from_mapping_file() -> tuple[dict[str, str], dict[str, str]]:
+    """
+    降级方案：从 strategy_name_mapping.yaml 加载映射。
+
     Returns:
         tuple: (正向映射表, 反向映射表)
     """
     try:
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+        if _MAPPING_FILE.exists():
+            with open(_MAPPING_FILE, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
-            
-            # 获取正向映射
-            strategy_names = config.get('strategy_names', {})
-            
-            # 生成反向映射
-            reverse_mapping = {v: k for k, v in strategy_names.items()}
-            
-            return strategy_names, reverse_mapping
+
+            strategy_names = config.get("strategy_names", {})
+            if strategy_names:
+                reverse_mapping = {v: k for k, v in strategy_names.items()}
+                return strategy_names, reverse_mapping
     except Exception as e:
-        print(f"警告: 无法从配置文件加载策略名称映射: {str(e)}")
-    
-    # 如果配置文件不存在或加载失败，使用默认映射
-    return _get_default_mapping()
+        print(f"警告: 无法从 strategy_name_mapping.yaml 加载策略名称映射: {e}")
+
+    return {}, {}
 
 
-def _get_default_mapping():
-    """
-    获取默认的策略名称映射（硬编码备用）
-    
-    Returns:
-        tuple: (正向映射表, 反向映射表)
-    """
-    default_map = {
-        'ContinuousRisingWithVolumeStrategyV2': '连阳回调策略',
-        'ResistanceBreakoutStrategy': '阻力位突破策略',
-        'TrendAccelerationInflectionStrategy': '趋势加速拐点',
-        'MorningStarStrategy': '启明星策略',
-        'MultiGoldenCrossStrategy': '多金叉共振',
-        'MultiPartyCannonStrategy': '多方炮策略',
-        'BottomTrendInflectionStrategy': '底部趋势拐点',
-        'LimitUpPullbackStrategy': '涨停回马枪策略',
-        'LimitUpSidewaysStrategy': '涨停横盘策略',
-        'StrongWashWeakToStrongStrategy': '强势洗盘弱转强',
-        'TrendResonanceReversalStrategy': '趋势共振反转策略',
-        'WBottomStrategy': 'W底策略',
-        'ImmortalGuidanceStrategy': '仙人指路策略',
-        'MA20MA60Strategy': '520560策略',
-        'Strategy2560Selection': '2560战法选股策略',
-        'TrendStartStrategy': '趋势起点策略',
-    }
-    
-    reverse_map = {v: k for k, v in default_map.items()}
-    return default_map, reverse_map
-
-
-def _get_strategy_name_map():
-    """
-    获取策略名称映射表（正向）
-    
-    Returns:
-        dict: 英文类名 -> 中文名称的映射表
-    """
+def _get_strategy_name_map() -> dict[str, str]:
+    """获取策略名称映射表（正向：英文类名→中文名称）"""
     global _STRATEGY_NAME_MAP
     if _STRATEGY_NAME_MAP is None:
-        _STRATEGY_NAME_MAP, _ = _load_mapping_from_config()
+        _STRATEGY_NAME_MAP, _ = _load_mapping_from_params()
     return _STRATEGY_NAME_MAP
 
 
-def _get_strategy_name_reverse_map():
-    """
-    获取策略名称映射表（反向）
-    
-    Returns:
-        dict: 中文名称 -> 英文类名的映射表
-    """
+def _get_strategy_name_reverse_map() -> dict[str, str]:
+    """获取策略名称映射表（反向：中文名称→英文类名）"""
     global _STRATEGY_NAME_REVERSE_MAP
     if _STRATEGY_NAME_REVERSE_MAP is None:
-        _, _STRATEGY_NAME_REVERSE_MAP = _load_mapping_from_config()
+        _, _STRATEGY_NAME_REVERSE_MAP = _load_mapping_from_params()
     return _STRATEGY_NAME_REVERSE_MAP
 
 
