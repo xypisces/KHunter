@@ -3,8 +3,9 @@ A股数据采集协调器 - 统一管理所有数据采集
 使用模块化设计，将不同功能分解到独立的模块中
 """
 import logging
+import pandas as pd
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 # 导入各个模块
 from utils.stock_data_fetcher import StockDataFetcher
@@ -300,11 +301,11 @@ class AKShareFetcher:
         )
     
     # ==================== 采集器管理 ====================
-    
+
     def _init_collectors(self) -> None:
         """初始化所有采集器"""
         self.collector_manager._init_collectors()
-    
+
     def _get_collector(self, collector_type: str):
         """获取指定类型的采集器"""
         return self.collector_manager._get_collector(collector_type)
