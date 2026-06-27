@@ -25,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from strategy.base_strategy import BaseStrategy
-from utils.technical import calculate_daily_return
+from indicators import calculate_daily_return
 
 
 class MorningStarStrategy(BaseStrategy):

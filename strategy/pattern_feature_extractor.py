@@ -10,8 +10,8 @@ from pathlib import Path
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.technical import (
-    MA, EMA, KDJ, calculate_zhixing_trend, REF, LLV, HHV
+from indicators import (
+    ma, ema, kdj, calculate_zhixing_trend, ref, llv, hhv
 )
 
 
@@ -45,10 +45,10 @@ class PatternFeatureExtractor:
         window_df['bull_bear_line'] = trend_df['bull_bear_line']
         
         # 计算KDJ
-        kdj_df = KDJ(window_df, n=9, m1=3, m2=3)
-        window_df['K'] = kdj_df['K']
-        window_df['D'] = kdj_df['D']
-        window_df['J'] = kdj_df['J']
+        k, d, j = kdj(window_df, n=9, m1=3, m2=3)
+        window_df['K'] = k
+        window_df['D'] = d
+        window_df['J'] = j
         
         features = {
             "trend_structure": self._extract_trend_features(window_df),

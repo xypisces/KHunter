@@ -151,16 +151,15 @@ def get_stock_detail(code: str) -> Any:
         df = df.sort_values("date", ascending=True).reset_index(drop=True)
 
         # 计算KDJ指标
-        from utils.technical import KDJ
+        from indicators import kdj
 
-        kdj_df = KDJ(df, n=9, m1=3, m2=3)
+        k, d, j = kdj(df, n=9, m1=3, m2=3)
 
         # 转换为列表格式，返回最近100条数据
         data = []
         start_idx = max(0, len(df) - 100)
         for i in range(start_idx, len(df)):
             row = df.iloc[i]
-            kdj_row = kdj_df.iloc[i]
             data.append(
                 {
                     "date": row["date"].strftime("%Y-%m-%d"),
@@ -179,9 +178,9 @@ def get_stock_detail(code: str) -> Any:
                         if "market_cap" in row and pd.notna(row.get("market_cap"))
                         else 0
                     ),
-                    "K": round(kdj_row["K"], 2) if pd.notna(kdj_row["K"]) else None,
-                    "D": round(kdj_row["D"], 2) if pd.notna(kdj_row["D"]) else None,
-                    "J": round(kdj_row["J"], 2) if pd.notna(kdj_row["J"]) else None,
+                    "K": round(k.iloc[i], 2) if pd.notna(k.iloc[i]) else None,
+                    "D": round(d.iloc[i], 2) if pd.notna(d.iloc[i]) else None,
+                    "J": round(j.iloc[i], 2) if pd.notna(j.iloc[i]) else None,
                 }
             )
 

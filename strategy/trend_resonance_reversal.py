@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from strategy.base_strategy import BaseStrategy
-from utils.technical import MA, MACD, RSI
+from indicators import ma, macd, rsi
 
 
 class TrendResonanceReversalStrategy(BaseStrategy):
@@ -71,21 +71,20 @@ class TrendResonanceReversalStrategy(BaseStrategy):
         result = df.copy()
         
         # 计算RSI指标
-        rsi_df = RSI(result, period=self.params['rsi_period'])
-        result['rsi'] = rsi_df['rsi']
-        
+        result['rsi'] = rsi(result, period=self.params['rsi_period'])
+
         # 计算均线
-        result['ma_short'] = MA(result['close'], self.params['short_ma_period'])
-        result['ma_long'] = MA(result['close'], self.params['long_ma_period'])
-        
+        result['ma_short'] = ma(result['close'], self.params['short_ma_period'])
+        result['ma_long'] = ma(result['close'], self.params['long_ma_period'])
+
         # 计算MACD指标
-        macd_df = MACD(result, 
-                      fastperiod=self.params['macd_fast'],
-                      slowperiod=self.params['macd_slow'],
-                      signalperiod=self.params['macd_signal'])
-        result['macd_dif'] = macd_df['macd']          # DIF线
-        result['macd_dea'] = macd_df['macd_signal']   # DEA线
-        result['macd_hist'] = macd_df['macd_hist']    # MACD柱状图
+        dif, dea, hist = macd(result,
+                              fast=self.params['macd_fast'],
+                              slow=self.params['macd_slow'],
+                              signal=self.params['macd_signal'])
+        result['macd_dif'] = dif        # DIF线
+        result['macd_dea'] = dea        # DEA线
+        result['macd_hist'] = hist      # MACD柱状图
         
         return result
     

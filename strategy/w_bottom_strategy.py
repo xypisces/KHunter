@@ -7,6 +7,7 @@ W底策略（WBottomStrategy）
 """
 import pandas as pd
 from strategy.base_strategy import BaseStrategy
+from indicators import ma, ema, kdj, llv, calculate_zhixing_trend
 
 
 class WBottomStrategy(BaseStrategy):
@@ -66,8 +67,6 @@ class WBottomStrategy(BaseStrategy):
         :param df: 股票数据DataFrame（倒序，最新在index=0）
         :return: 添加了指标列的DataFrame
         """
-        from utils.technical import MA, KDJ, calculate_zhixing_trend
-
         # 检查输入数据是否为空
         if df is None or df.empty:
             return df
@@ -81,24 +80,22 @@ class WBottomStrategy(BaseStrategy):
         # 2. 计算短期均线和长期均线
         short_period = self.params['short_ma_period']
         long_period = self.params['long_ma_period']
-        result['short_ma'] = MA(result['close'], short_period)
-        result['long_ma'] = MA(result['close'], long_period)
+        result['short_ma'] = ma(result['close'], short_period)
+        result['long_ma'] = ma(result['close'], long_period)
 
         # 3. 计算KDJ指标（K、D、J）
-        kdj_df = KDJ(result, n=9, m1=3, m2=3)
-        result['K'] = kdj_df['K']
-        result['D'] = kdj_df['D']
-        result['J'] = kdj_df['J']
+        k, d, j = kdj(result, n=9, m1=3, m2=3)
+        result['K'] = k
+        result['D'] = d
+        result['J'] = j
 
         # 4. 计算知行趋势线（短期趋势线和多空线）
-        # 优化：直接计算，减少函数调用开销
-        from utils.technical import EMA
         # 知行短期趋势线 = EMA(EMA(CLOSE,10),10)
-        result['short_term_trend'] = EMA(EMA(result['close'], 10), 10)
+        result['short_term_trend'] = ema(ema(result['close'], 10), 10)
         # 知行多空线 = (MA(m1) + MA(m2) + MA(m3) + MA(m4)) / 4
         m1, m2, m3, m4 = 14, 28, 57, 114
-        result['bull_bear_line'] = (MA(result['close'], m1) + MA(result['close'], m2) + 
-                                   MA(result['close'], m3) + MA(result['close'], m4)) / 4
+        result['bull_bear_line'] = (ma(result['close'], m1) + ma(result['close'], m2) +
+                                   ma(result['close'], m3) + ma(result['close'], m4)) / 4
 
         # 5. 计算成交量均线（排除当日，shift(1)后再rolling）
         vol_period = self.params['volume_ma_period']
@@ -126,7 +123,6 @@ class WBottomStrategy(BaseStrategy):
         :param pattern_days: 形态扫描回溯天数
         :return: 局部低点列表 [(index, price, date), ...]
         """
-        from utils.technical import LLV
         import numpy as np
 
         # 获取参数
@@ -138,12 +134,12 @@ class WBottomStrategy(BaseStrategy):
         scan_start = 5  # 排除最新的 5 天
         scan_end = min(scan_start + pattern_days, len(df))
         scan_df = df.iloc[scan_start:scan_end].copy()
-        
+
         if len(scan_df) < low_window:
             return []
 
         # 使用 LLV 计算窗口内最低值
-        llv_values = LLV(scan_df['low'], low_window)
+        llv_values = llv(scan_df['low'], low_window)
 
         # 识别局部低点：该交易日的 low == LLV 窗口最小值 - 使用向量化操作优化
         # 创建布尔掩码：low等于LLV值（浮点数比较使用近似相等）

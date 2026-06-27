@@ -113,8 +113,14 @@ class BaseStrategy(ABC):
     def calculate_indicators(self, df) -> pd.DataFrame:
         """
         计算技术指标
-        :param df: 股票数据DataFrame
-        :return: 添加了指标列的DataFrame
+
+        合约：
+        - 输入 df 为倒序 DataFrame（最新日期在前），包含 date/open/high/low/close/volume 列
+        - 返回的 DataFrame 保持相同的倒序和索引
+        - 指标函数来自 indicators/ 模块，自动处理排序方向，子类无需手动排序
+
+        :param df: 倒序股票数据 DataFrame（最新在前）
+        :return: 添加了指标列的 DataFrame，保持倒序
         """
         pass
     

@@ -24,7 +24,7 @@ from scipy import stats
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from strategy.base_strategy import BaseStrategy
-from utils.technical import MA, EMA, KDJ, calculate_zhixing_trend
+from indicators import ma, ema, kdj, calculate_zhixing_trend
 
 
 class TrendAccelerationInflectionStrategy(BaseStrategy):
@@ -122,10 +122,10 @@ class TrendAccelerationInflectionStrategy(BaseStrategy):
         
         try:
             # 计算KDJ指标（与其他策略保持一致）
-            kdj_df = KDJ(result, n=9, m1=3, m2=3)
-            result['K'] = kdj_df['K'].fillna(50)  # 默认值 50
-            result['D'] = kdj_df['D'].fillna(50)  # 默认值 50
-            result['J'] = kdj_df['J'].fillna(50)  # 默认值 50
+            k, d, j = kdj(result, n=9, m1=3, m2=3)
+            result['K'] = k.fillna(50)  # 默认值 50
+            result['D'] = d.fillna(50)  # 默认值 50
+            result['J'] = j.fillna(50)  # 默认值 50
         except Exception as e:
             # KDJ 计算失败，使用默认值
             result['K'] = 50

@@ -28,6 +28,12 @@ from indicators.volatility import atr, bollinger
 # 区间辅助函数
 from indicators.range import exist, hhv, llv, ref
 
+# 趋势指标
+from indicators.trend import calculate_zhixing_trend
+
+# 收益率指标
+from indicators.returns import calculate_daily_return, calculate_price_change
+
 # 缓存包装器
 from indicators._cache import CachedIndicators
 
@@ -51,6 +57,11 @@ __all__ = [
     "hhv",
     "ref",
     "exist",
+    # 趋势指标
+    "calculate_zhixing_trend",
+    # 收益率指标
+    "calculate_price_change",
+    "calculate_daily_return",
     # 缓存
     "CachedIndicators",
 ]

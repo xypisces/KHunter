@@ -32,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from strategy.base_strategy import BaseStrategy
-from utils.technical import REF, MA, calculate_daily_return
+from indicators import ref, ma, kdj, calculate_daily_return, calculate_zhixing_trend
 
 
 class MultiPartyCannonStrategy(BaseStrategy):
@@ -111,11 +111,10 @@ class MultiPartyCannonStrategy(BaseStrategy):
             result['MACD'] = result['DIF'] - result['DEA']
             
             # 计算KDJ指标
-            from utils.technical import KDJ
-            kdj_df = KDJ(result, n=9, m1=3, m2=3)
-            result['K'] = kdj_df['K']
-            result['D'] = kdj_df['D']
-            result['J'] = kdj_df['J']
+            k, d, j = kdj(result, n=9, m1=3, m2=3)
+            result['K'] = k
+            result['D'] = d
+            result['J'] = j
         
         # 只在需要时计算均线
         if self.params['enable_ma_filter']:
@@ -123,7 +122,6 @@ class MultiPartyCannonStrategy(BaseStrategy):
             result[f'MA{ma_period}'] = result['close'].rolling(window=ma_period).mean()
             
             # 计算趋势线
-            from utils.technical import calculate_zhixing_trend
             trend_df = calculate_zhixing_trend(
                 result,
                 m1=14,
