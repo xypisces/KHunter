@@ -158,11 +158,10 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(khunter_bp)
 
 
-def create_app(config_file: str = "config/config.yaml") -> tuple[Flask, SocketIO]:
+def create_app() -> tuple[Flask, SocketIO]:
     """
     创建 Flask 应用和 SocketIO 实例
 
-    :param config_file: 配置文件路径
     :return: (app, socketio) 元组
     """
     # 配置日志

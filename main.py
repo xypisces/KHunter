@@ -35,38 +35,33 @@ from utils.akshare_fetcher import AKShareFetcher
 from strategy.strategy_registry import get_registry
 from utils.db_initializer import init_databases_if_needed
 from utils.stock_filter import StockFilter
-import yaml
 
 
 class QuantSystem:
     """量化系统主类"""
-    
-    def __init__(self, config_file="config/config.yaml"):
+
+    def __init__(self, config_file: str = "config/config.yaml"):
         # 初始化日志系统
         from utils.log_config import LogConfig
         LogConfig.setup_logging()
-        
-        self.config = self._load_config(config_file)
-        self.data_dir = self.config.get('data_dir', 'data')
-        
+
+        from utils.app_config import get_app_config, AppConfig
+        import utils.app_config as _app_config_mod
+        # 如果指定了非默认配置文件，重新初始化单例
+        if config_file != "config/config.yaml":
+            _app_config_mod._instance = AppConfig(Path(config_file))
+        self._config = get_app_config()
+        self.data_dir = self._config.get('data_dir', 'data')
+
         # 初始化数据库（如果不存在）
         init_databases_if_needed(self.data_dir)
-        
+
         # 初始化数据库管理器
         from utils.global_db import get_global_db, get_stock_repo
         self.db_manager = get_global_db()
         self.stock_repo = get_stock_repo()
         self.fetcher = AKShareFetcher(self.data_dir)
         self.registry = get_registry("config/strategy_params.yaml")
-    
-    def _load_config(self, config_file):
-        """加载配置文件"""
-        config_path = Path(config_file)
-        if config_path.exists():
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f) or {}
-        return {}
-    
 
     def _load_stock_names(self, stock_data):
         """加载股票名称（从数据库读取，不再使用 stock_names.json）"""
@@ -298,7 +293,7 @@ class QuantSystem:
         
         # 应用过滤条件
         print("\n应用过滤条件...")
-        filter_config = self.config.get('filters', {})
+        filter_config = self._config.get('filters', {})
         stock_filter = StockFilter(filter_config)
         
         # 构建股票数据字典用于过滤
@@ -544,7 +539,7 @@ class QuantSystem:
             print("✗ 请安装 schedule: pip install schedule")
             return
         
-        schedule_time = self.config.get('schedule', {}).get('time', '15:05')
+        schedule_time = self._config.get('schedule', {}).get('time', '15:05')
         
         print("=" * 60)
         print(f"⏰ 启动定时调度")

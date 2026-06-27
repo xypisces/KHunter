@@ -67,16 +67,9 @@ def get_stats() -> Any:
 def get_config() -> Any:
     """获取系统配置"""
     try:
-        import yaml
-        from pathlib import Path
+        from utils.app_config import get_app_config
 
-        config_file = Path("config/config.yaml")
-        if config_file.exists():
-            with open(config_file, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
-        else:
-            config = {}
-
+        config = get_app_config().get_all()
         return jsonify({"success": True, "data": config})
     except Exception as e:
         logger.error(f"获取配置失败: {str(e)}")
@@ -87,26 +80,10 @@ def get_config() -> Any:
 def update_config() -> Any:
     """更新系统配置"""
     try:
-        import yaml
-        from pathlib import Path
+        from utils.app_config import get_app_config
 
         data = request.get_json(silent=True) or {}
-        config_file = Path("config/config.yaml")
-
-        # 读取现有配置
-        if config_file.exists():
-            with open(config_file, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
-        else:
-            config = {}
-
-        # 更新配置
-        config.update(data)
-
-        # 写入配置文件
-        with open(config_file, "w", encoding="utf-8") as f:
-            yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
-
+        get_app_config().update(data)
         return jsonify({"success": True, "message": "配置已更新"})
     except Exception as e:
         logger.error(f"更新配置失败: {str(e)}")
