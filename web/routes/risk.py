@@ -22,18 +22,20 @@ def get_risk_status() -> Any:
         if date:
             rows = db_manager.query(
                 """
-                SELECT risk_date, var_1d, var_5d, max_drawdown, volatility, risk_level
+                SELECT date, var_1d, var_5d, es_1d, risk_level,
+                       position_limit, stop_loss_multiplier, liquidate
                 FROM risk_status
-                WHERE risk_date = ?
+                WHERE date = ?
                 """,
                 (date,),
             )
         else:
             rows = db_manager.query(
                 """
-                SELECT risk_date, var_1d, var_5d, max_drawdown, volatility, risk_level
+                SELECT date, var_1d, var_5d, es_1d, risk_level,
+                       position_limit, stop_loss_multiplier, liquidate
                 FROM risk_status
-                ORDER BY risk_date DESC
+                ORDER BY date DESC
                 LIMIT 1
                 """
             )
@@ -44,12 +46,14 @@ def get_risk_status() -> Any:
                 {
                     "success": True,
                     "data": {
-                        "date": row["risk_date"],
+                        "date": row["date"],
                         "var_1d": row["var_1d"],
                         "var_5d": row["var_5d"],
-                        "max_drawdown": row["max_drawdown"],
-                        "volatility": row["volatility"],
+                        "es_1d": row["es_1d"],
                         "risk_level": row["risk_level"],
+                        "position_limit": row["position_limit"],
+                        "stop_loss_multiplier": row["stop_loss_multiplier"],
+                        "liquidate": bool(row["liquidate"]),
                     },
                 }
             )
@@ -66,6 +70,30 @@ def get_risk_status() -> Any:
         return jsonify({"success": False, "error": str(e)})
 
 
+@risk_bp.route("/history")
+def get_risk_history() -> Any:
+    """获取风控历史记录"""
+    try:
+        db_manager = get_db_manager()
+        days = int(request.args.get("days", 30))
+
+        rows = db_manager.query(
+            """
+            SELECT date, var_1d, var_5d, es_1d, risk_level,
+                   position_limit, stop_loss_multiplier, liquidate
+            FROM risk_status
+            ORDER BY date DESC
+            LIMIT ?
+            """,
+            (days,),
+        )
+
+        return jsonify({"success": True, "data": [dict(r) for r in rows]})
+    except Exception as e:
+        logger.error(f"获取风控历史失败: {str(e)}")
+        return jsonify({"success": False, "error": str(e)})
+
+
 @risk_bp.route("/alerts")
 def get_risk_alerts() -> Any:
     """获取风控预警"""
@@ -73,17 +101,25 @@ def get_risk_alerts() -> Any:
         db_manager = get_db_manager()
         limit = int(request.args.get("limit", 20))
 
+        # risk_alerts 表可能不存在，做兼容处理
+        table_check = db_manager.query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='risk_alerts'"
+        )
+        if not table_check:
+            return jsonify({"success": True, "data": [], "message": "预警表尚未创建"})
+
         rows = db_manager.query(
             """
-            SELECT alert_date, alert_type, stock_code, stock_name, message, level
-            FROM risk_alerts
-            ORDER BY alert_date DESC
+            SELECT date as alert_date, '' as alert_type, '' as stock_code,
+                   '' as stock_name, '' as message, risk_level as level
+            FROM risk_status
+            ORDER BY date DESC
             LIMIT ?
             """,
             (limit,),
         )
 
-        return jsonify({"success": True, "data": rows})
+        return jsonify({"success": True, "data": [dict(r) for r in rows]})
     except Exception as e:
         logger.error(f"获取风控预警失败: {str(e)}")
         return jsonify({"success": False, "error": str(e)})

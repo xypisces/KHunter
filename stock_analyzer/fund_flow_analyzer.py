@@ -4,7 +4,7 @@
 资金流向分析模块
 """
 from typing import Dict, Any
-from .data_fetcher import DataFetcher
+from .data_fetcher import StockAnalyzerDataFetcher
 
 
 class FundFlowAnalyzer:
@@ -12,7 +12,7 @@ class FundFlowAnalyzer:
     
     def __init__(self):
         """初始化资金流向分析器"""
-        self.data_fetcher = DataFetcher()
+        self.data_fetcher = StockAnalyzerDataFetcher()
     
     def analyze(self, stock_code: str, period: str = '30d') -> Dict[str, Any]:
         """分析股票资金流向
@@ -92,15 +92,12 @@ class FundFlowAnalyzer:
         """
         try:
             # 获取历史行情数据
-            quote_data = self.data_fetcher.get_stock_quote(stock_code, period=period)
-            
-            if not quote_data.empty and 'volume' in quote_data.columns:
-                # 计算成交量平均值
-                avg_volume = quote_data['volume'].mean()
-                
-                # 计算最近成交量
-                recent_volume = quote_data['volume'].iloc[-1] if len(quote_data) > 0 else 0
-                
+            quote_data = self.data_fetcher.get_stock_quote(stock_code)
+
+            if quote_data and quote_data.get("volume"):
+                recent_volume = float(quote_data["volume"])
+                avg_volume = recent_volume  # 单点数据无法计算均值，用当前值近似
+
                 # 判断成交量趋势
                 if recent_volume > avg_volume * 1.5:
                     trend = "放量"

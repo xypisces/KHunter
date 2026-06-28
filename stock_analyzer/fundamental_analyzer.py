@@ -5,12 +5,13 @@
 """
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, cast
+import pandas as pd
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.akshare_retry import akshare_call_with_retry
-from .data_fetcher import DataFetcher
+from .data_fetcher import StockAnalyzerDataFetcher
 
 
 class FundamentalAnalyzer:
@@ -18,7 +19,7 @@ class FundamentalAnalyzer:
     
     def __init__(self):
         """初始化基本面分析器"""
-        self.data_fetcher = DataFetcher()
+        self.data_fetcher = StockAnalyzerDataFetcher()
     
     def analyze(self, stock_code: str) -> Dict[str, Any]:
         """分析股票基本面
@@ -98,15 +99,15 @@ class FundamentalAnalyzer:
             import akshare as ak
             
             # 通过重试包装器获取股票实时数据
-            stock_quote = akshare_call_with_retry(ak.stock_zh_a_spot_em)
+            stock_quote = cast(pd.DataFrame, akshare_call_with_retry(ak.stock_zh_a_spot_em))
             
             if stock_quote is not None and not stock_quote.empty:
                 # 检查列是否存在
                 code_col = "代码" if "代码" in stock_quote.columns else "code"
                 price_col = "最新价" if "最新价" in stock_quote.columns else "price"
                 
-                stock_data = stock_quote[stock_quote[code_col] == stock_code]
-                
+                stock_data: pd.DataFrame = stock_quote[stock_quote[code_col] == stock_code]  # type: ignore[assignment]
+
                 if not stock_data.empty:
                     # 获取当前价格
                     price = stock_data[price_col].iloc[0]
@@ -153,7 +154,7 @@ class FundamentalAnalyzer:
                 ak.stock_financial_analysis_indicator, symbol=stock_code
             )
             
-            if not financial_data.empty:
+            if financial_data is not None and not financial_data.empty:
                 # 计算增长率（简单模拟）
                 revenue_growth = 0.1  # 模拟营收增长率
                 profit_growth = 0.15  # 模拟利润增长率

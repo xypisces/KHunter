@@ -361,6 +361,38 @@ class BacktestDAO:
         """
         return self.get_result(result_id)
     
+    def get_results(self, page: int = 1, per_page: int = 20) -> Dict[str, Any]:
+        """
+        获取回测结果列表（分页）
+
+        Args:
+            page: 页码（从1开始）
+            per_page: 每页数量
+
+        Returns:
+            包含 items、total、page、per_page 的字典
+        """
+        try:
+            offset = (page - 1) * per_page
+
+            count_sql = "SELECT COUNT(*) as total FROM backtest_result"
+            count_row = self.db.query_one(count_sql)
+            total = count_row['total'] if count_row else 0
+
+            sql = "SELECT * FROM backtest_result ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            results = self.db.query(sql, (per_page, offset))
+
+            return {
+                "items": [dict(r) for r in results],
+                "total": total,
+                "page": page,
+                "per_page": per_page,
+            }
+
+        except Exception as e:
+            logger.error(f"获取回测结果失败: {str(e)}")
+            return {"items": [], "total": 0, "page": page, "per_page": per_page}
+
     def get_all_results(self, strategy_name=None, created_date=None, created_start=None, created_end=None) -> List[Dict]:
         """
         获取所有回测结果（支持按策略名称和创建时间筛选）
@@ -397,9 +429,9 @@ class BacktestDAO:
             
             sql += " ORDER BY created_at DESC"
             
-            results = self.db.query(sql, params)
+            results = self.db.query(sql, tuple(params))
             return [dict(result) for result in results]
-            
+
         except Exception as e:
             logger.error(f"获取所有回测结果失败: {str(e)}")
             return []
@@ -654,7 +686,7 @@ class BacktestDAO:
             
             cursor = self.db.execute(sql, params)
             self.db.connect().commit()
-            return cursor.lastrowid
+            return cursor.lastrowid or 0
             
         except Exception as e:
             logger.error(f"保存交易记录失败: {str(e)}")

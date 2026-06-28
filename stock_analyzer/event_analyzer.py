@@ -4,7 +4,7 @@
 事件分析模块
 """
 from typing import Dict, Any, List
-from .data_fetcher import DataFetcher
+from .data_fetcher import StockAnalyzerDataFetcher
 from datetime import datetime, timedelta
 
 
@@ -13,7 +13,7 @@ class EventAnalyzer:
     
     def __init__(self):
         """初始化事件分析器"""
-        self.data_fetcher = DataFetcher()
+        self.data_fetcher = StockAnalyzerDataFetcher()
     
     def analyze(self, stock_code: str, period: str = '30d') -> List[Dict[str, Any]]:
         """分析股票相关事件

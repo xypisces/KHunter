@@ -1,12 +1,12 @@
 """
 指数数据获取模块 - 获取指数历史数据并计算收益率
 """
-import tushare as ts
+import akshare as ak
 import pandas as pd
 import numpy as np
 import logging
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 from datetime import datetime, timedelta
 from io import StringIO
 from utils.cache_manager import CacheManager
@@ -44,7 +44,7 @@ class IndexDataFetcher:
             config_loader = RiskConfigLoader()
             config = config_loader.load_config()
             # 支持两种格式：932000.CSI（完整ts_code）或 932000（纯数字，默认添加.SH）
-            index_code_raw = config.get('risk', {}).get('index_code', '932000.CSI')
+            index_code_raw = config.get('risk', {}).get('index_code', '932000.CSI') if config else '932000.CSI'
             if '.' in index_code_raw:
                 # 完整格式如 932000.CSI，分别提取代码和后缀
                 parts = index_code_raw.split('.')
@@ -63,9 +63,11 @@ class IndexDataFetcher:
             self.ts_code = '932000.CSI'
             self.index_name = '中证2000'
         
-        logger.info(f"IndexDataFetcher 初始化完成，指数: {self.index_name}({self.index_code})")
+        # 构建 akshare 格式的指数代码（如 csi932000、sh000852）
+        self.ak_symbol = f'{self.index_suffix.lower()}{self.index_code}'
+        logger.info(f"IndexDataFetcher 初始化完成，指数: {self.index_name}({self.index_code}), akshare代码: {self.ak_symbol}")
     
-    def fetch_index_data(self, start_date: str = None, end_date: str = None, 
+    def fetch_index_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None,
                          use_cache: bool = True) -> Optional[pd.DataFrame]:
         """
         获取指数历史数据（指数代码由配置决定，默认中证2000）
@@ -95,32 +97,21 @@ class IndexDataFetcher:
                 return pd.read_json(StringIO(cached_data))
         
         try:
-            # 使用tushare获取指数数据
-            logger.info(f"获取{self.index_name}指数数据: {start_date} ~ {end_date}")
-            
-            # 初始化tushare
-            pro = ts.pro_api()
-            
-            # tushare指数数据接口（使用完整ts_code，如 932000.CSI / 000852.SH）
-            df = pro.index_daily(ts_code=self.ts_code, 
-                                start_date=start_date, 
-                                end_date=end_date)
+            # 使用akshare获取指数数据
+            logger.info(f"获取{self.index_name}指数数据: {start_date} ~ {end_date}, 代码: {self.ak_symbol}")
+
+            df = ak.stock_zh_index_daily_em(symbol=self.ak_symbol,
+                                            start_date=start_date,
+                                            end_date=end_date)
             
             if df is None or df.empty:
                 logger.error(f"获取{self.index_name}指数数据失败: 数据为空")
                 return None
             
-            # 重命名列
-            df = df.rename(columns={
-                'trade_date': 'date',
-                'open': 'open',
-                'close': 'close',
-                'high': 'high',
-                'low': 'low',
-                'vol': 'volume',
-                'amount': 'amount',
-                'pct_chg': 'change_pct'
-            })
+            # akshare 返回的列名已是 date/open/close/high/low/volume/amount
+            # 计算涨跌幅（akshare 不返回 pct_chg）
+            if 'change_pct' not in df.columns:
+                df['change_pct'] = df['close'].pct_change() * 100
             
             # 确保日期格式正确
             df['date'] = pd.to_datetime(df['date'])
@@ -128,7 +119,7 @@ class IndexDataFetcher:
             
             # 缓存数据
             if use_cache:
-                self.cache_manager.set(cache_key, df.to_json())
+                self.cache_manager.set(cache_key, df.to_json(date_format='iso'))
                 logger.info(f"指数数据已缓存: {cache_key}")
             
             logger.info(f"成功获取{self.index_name}指数数据，共 {len(df)} 条记录")
@@ -156,22 +147,22 @@ class IndexDataFetcher:
         try:
             if method == 'log':
                 # 对数收益率: ln(Pt/Pt-1)
-                returns = np.log(df['close'] / df['close'].shift(1))
+                returns: pd.Series = np.log(df['close'] / df['close'].shift(1))  # type: ignore[assignment]
             else:
                 # 简单收益率: (Pt-Pt-1)/Pt-1
-                returns = (df['close'] - df['close'].shift(1)) / df['close'].shift(1)
-            
+                returns: pd.Series = (df['close'] - df['close'].shift(1)) / df['close'].shift(1)  # type: ignore[assignment]
+
             # 删除第一行（NaN）
-            returns = returns.dropna().values
-            
-            logger.info(f"计算收益率完成，共 {len(returns)} 个数据点")
-            return returns
+            result = np.asarray(returns.dropna())
+
+            logger.info(f"计算收益率完成，共 {len(result)} 个数据点")
+            return result
             
         except Exception as e:
             logger.error(f"计算收益率失败: {str(e)}")
             return np.array([])
     
-    def fetch_index_returns(self, end_date: str = None, lookback_days: int = 500,
+    def fetch_index_returns(self, end_date: Optional[str] = None, lookback_days: int = 500,
                             use_cache: bool = True) -> Optional[np.ndarray]:
         """
         获取指数过去lookback_days个交易日的对数收益率（指数代码由配置决定）
@@ -249,7 +240,7 @@ class IndexDataFetcher:
     def clear_cache(self):
         """清空缓存"""
         try:
-            self.cache_manager.clear_all()
+            self.cache_manager.clear()
             logger.info("指数数据缓存已清空")
         except Exception as e:
             logger.error(f"清空缓存失败: {str(e)}")

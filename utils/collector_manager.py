@@ -7,10 +7,6 @@ from utils.cache_manager import CacheManager
 
 # 显式导入采集器模块，触发注册
 from utils import basic_data_fetcher
-from utils import industry_fetcher
-from utils import sector_fetcher
-from utils import fund_flow_fetcher
-from utils import event_fetcher
 
 # 配置日志
 logger = logging.getLogger(__name__)

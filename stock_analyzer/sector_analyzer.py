@@ -4,7 +4,7 @@
 板块分析模块
 """
 from typing import Dict, Any
-from .data_fetcher import DataFetcher
+from .data_fetcher import StockAnalyzerDataFetcher
 
 
 class SectorAnalyzer:
@@ -12,7 +12,7 @@ class SectorAnalyzer:
     
     def __init__(self):
         """初始化板块分析器"""
-        self.data_fetcher = DataFetcher()
+        self.data_fetcher = StockAnalyzerDataFetcher()
     
     def analyze(self, stock_code: str) -> Dict[str, Any]:
         """分析股票所属板块
