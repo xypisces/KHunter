@@ -453,6 +453,115 @@ class TradingCoreMixin:
         elif not is_cooling:
             self.loss_cool_down_pool.pop(stock_code, None)
 
+    # ========== 卖出基础设施 ==========
+
+    def get_sell_price(self, stock_code: str, context: dict) -> float:
+        """获取卖出价格（由子类实现）。
+
+        Args:
+            stock_code: 股票代码
+            context: 上下文信息（回测传 date，实盘传 current_price）
+
+        Returns:
+            卖出价格，0 表示无法获取
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def calculate_sell_cost(stock_code: str, price: float, quantity: int) -> dict:
+        """计算卖出成本（委托给 calculate_cost，无滑点）。
+
+        Args:
+            stock_code: 股票代码
+            price: 卖出价格
+            quantity: 卖出数量
+
+        Returns:
+            成本明细字典，包含 commission, transfer_fee, stamp_tax, total_cost
+        """
+        return calculate_cost(stock_code, price, quantity, is_buy=False)
+
+    @staticmethod
+    def create_sell_record(
+        position: Dict,
+        sell_date,
+        sell_price: float,
+        quantity: int,
+        sell_type: str,
+        hold_days: int,
+        detail_url: str = '',
+    ) -> Dict:
+        """创建标准化卖出记录（含完整成本明细）。
+
+        Args:
+            position: 持仓信息，需包含 stock_code, stock_name, buy_date, buy_price,
+                      buy_amount, quantity；可选 buy_commission, buy_transfer_fee
+            sell_date: 卖出日期
+            sell_price: 卖出价格
+            quantity: 卖出数量
+            sell_type: 卖出类型（take_profit, stop_loss, trailing_stop, position_expire,
+                       strategy_sell, strategy_reduce 等）
+            hold_days: 持有天数
+            detail_url: 股票详情链接
+
+        Returns:
+            标准化卖出记录字典（19 个字段）
+        """
+        cost_info = calculate_cost(
+            position['stock_code'], sell_price, quantity, is_buy=False
+        )
+
+        # 持仓分摊比例（用于减仓时分摊成本）
+        total_quantity = position.get('quantity', quantity)
+        ratio = quantity / total_quantity if total_quantity > 0 else 1.0
+
+        # 分摊的买入成本
+        allocated_buy_amount = position.get('buy_amount', 0) * ratio
+        allocated_buy_commission = position.get('buy_commission', 0) * ratio
+        allocated_buy_transfer_fee = position.get('buy_transfer_fee', 0) * ratio
+        total_allocated_cost = allocated_buy_amount + allocated_buy_commission + allocated_buy_transfer_fee
+
+        # 卖出成本
+        sell_commission = cost_info['commission']
+        sell_transfer_fee = cost_info['transfer_fee']
+        sell_stamp_tax = cost_info['stamp_tax']
+        total_sell_cost = sell_commission + sell_transfer_fee + sell_stamp_tax
+
+        # 净卖出金额
+        sell_amount = sell_price * quantity
+        net_sell_amount = sell_amount - total_sell_cost
+
+        # 含成本的盈亏和收益率
+        profit_loss = net_sell_amount - total_allocated_cost
+        actual_return_rate = (
+            (net_sell_amount - total_allocated_cost) / total_allocated_cost * 100
+            if total_allocated_cost > 0 else 0
+        )
+
+        return {
+            'stock_code': position['stock_code'],
+            'stock_name': position.get('stock_name', ''),
+            'selection_date': position.get('selection_date'),
+            'buy_date': position.get('buy_date'),
+            'buy_price': position.get('buy_price', 0),
+            'buy_amount': allocated_buy_amount,
+            'quantity': quantity,
+            'sell_date': sell_date,
+            'sell_price': sell_price,
+            'sell_amount': net_sell_amount,
+            'sell_type': sell_type,
+            'return_rate': actual_return_rate,
+            'profit_loss': profit_loss,
+            'hold_days': hold_days,
+            'detail_url': detail_url,
+            'trade_type': 'sell' if quantity >= total_quantity else 'reduce',
+            'buy_commission': allocated_buy_commission,
+            'buy_transfer_fee': allocated_buy_transfer_fee,
+            'sell_commission': sell_commission,
+            'sell_transfer_fee': sell_transfer_fee,
+            'sell_stamp_tax': sell_stamp_tax,
+        }
+
     # ========== 工具方法 ==========
 
     @staticmethod

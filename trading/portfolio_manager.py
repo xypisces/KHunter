@@ -133,8 +133,10 @@ class PortfolioManager:
             return {"success": False, "error": str(e)}
 
     def _execute_sell(self, stock_code: str, signal: Dict, portfolio: Dict, config: Dict) -> Dict:
-        """执行卖出操作"""
+        """执行卖出操作（使用 TradingCoreMixin 的统一成本模型和记录格式）。"""
         try:
+            from trading.trading_core_mixin import TradingCoreMixin
+
             # 检查是否持有
             if stock_code not in portfolio:
                 return {"success": False, "error": f"未持有 {stock_code}"}
@@ -146,14 +148,36 @@ class PortfolioManager:
             if price <= 0:
                 return {"success": False, "error": "无效的价格"}
 
+            # 计算卖出成本
+            cost_info = TradingCoreMixin.calculate_sell_cost(stock_code, price, shares)
+
             # 从持仓中移除
             del portfolio[stock_code]
-
             self.save_portfolio(portfolio)
 
-            # 计算盈亏
+            # 计算盈亏（含成本）
             cost_price = position.get("cost_price", 0)
-            profit = (price - cost_price) * shares if cost_price > 0 else 0
+            buy_amount = cost_price * shares if cost_price > 0 else 0
+            total_sell_cost = cost_info['commission'] + cost_info['transfer_fee'] + cost_info['stamp_tax']
+            net_sell_amount = price * shares - total_sell_cost
+            profit = net_sell_amount - buy_amount
+
+            # 创建标准化卖出记录
+            sell_record = TradingCoreMixin.create_sell_record(
+                position={
+                    'stock_code': stock_code,
+                    'stock_name': position.get('stock_name', ''),
+                    'buy_date': position.get('buy_date'),
+                    'buy_price': cost_price,
+                    'buy_amount': buy_amount,
+                    'quantity': shares,
+                },
+                sell_date=datetime.date.today(),
+                sell_price=price,
+                quantity=shares,
+                sell_type=signal.get('sell_type', 'manual'),
+                hold_days=signal.get('hold_days', 0),
+            )
 
             return {
                 "success": True,
@@ -162,6 +186,7 @@ class PortfolioManager:
                 "shares": shares,
                 "price": price,
                 "profit": round(profit, 2),
+                "sell_record": sell_record,
             }
         except Exception as e:
             logger.error(f"执行卖出失败: {str(e)}")

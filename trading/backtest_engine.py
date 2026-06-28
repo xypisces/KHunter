@@ -62,7 +62,15 @@ class BacktestEngine(TradingCoreMixin):
 
         # 移动止损：持仓期间最高收益率
         self.position_highest_profit = {}  # {stock_code: highest_profit}
-        
+
+    def get_sell_price(self, stock_code: str, context: dict) -> float:
+        """回测引擎：使用当日开盘价作为卖出价格。"""
+        current_date = context.get('date')
+        if current_date is None:
+            return 0.0
+        price = self._get_stock_price(stock_code, current_date, 'open')
+        return price if price is not None else 0.0
+
     def run_backtest(self, strategy_name: str, config: Dict) -> Dict:
         """运行回测
         
@@ -1684,73 +1692,19 @@ class BacktestEngine(TradingCoreMixin):
         return remaining_positions, sell_records
     
     def _create_sell_record(self, position: Dict, sell_date: date, sell_price: float,
-                            quantity: int, sell_amount: float, return_rate: float, hold_days: int, 
+                            quantity: int, sell_amount: float, return_rate: float, hold_days: int,
                             sell_type: str) -> Dict:
-        """创建卖出记录
-        
-        Args:
-            position: 持仓信息
-            sell_date: 卖出日期
-            sell_price: 卖出价格
-            quantity: 卖出数量
-            sell_amount: 卖出金额
-            return_rate: 收益率（已含成本预估）
-            hold_days: 持有天数
-            sell_type: 卖出类型
-            
-        Returns:
-            卖出记录字典
-        """
-        # 计算卖出成本
-        cost_info = calculate_backtest_cost(position['stock_code'], sell_price, quantity, is_buy=False)
-        
-        # 持仓分摊比例（用于分摊成本）
-        ratio = quantity / position['quantity']
-        
-        # 分摊的买入成本
-        allocated_buy_amount = position['buy_amount'] * ratio
-        allocated_buy_commission = position.get('buy_commission', 0) * ratio if position.get('buy_commission') else 0
-        allocated_buy_transfer_fee = position.get('buy_transfer_fee', 0) * ratio if position.get('buy_transfer_fee') else 0
-        total_allocated_cost = allocated_buy_amount + allocated_buy_commission + allocated_buy_transfer_fee
-        
-        # 卖出成本
-        sell_commission = cost_info['commission']
-        sell_transfer_fee = cost_info['transfer_fee']
-        sell_stamp_tax = cost_info['stamp_tax']
-        total_sell_cost = sell_commission + sell_transfer_fee + sell_stamp_tax
-        
-        # 净卖出金额
-        net_sell_amount = sell_amount - total_sell_cost
-        
-        # 计算含成本的 profit_loss 和 return_rate
-        profit_loss = net_sell_amount - total_allocated_cost
-        actual_return_rate = (net_sell_amount - total_allocated_cost) / total_allocated_cost * 100 if total_allocated_cost > 0 else 0
-        
-        return {
-            'stock_code': position['stock_code'],
-            'stock_name': position['stock_name'],
-            'selection_date': None,
-            'buy_date': position['buy_date'],
-            'buy_price': position['buy_price'],
-            'buy_amount': allocated_buy_amount,
-            'quantity': quantity,
-            'sell_date': sell_date,
-            'sell_price': sell_price,
-            'sell_amount': net_sell_amount,
-            'sell_type': sell_type,
-            'return_rate': actual_return_rate,
-            'profit_loss': profit_loss,
-            'hold_days': hold_days,
-            'detail_url': self._generate_stock_detail_url(position['stock_code']),
-            'trade_type': 'sell' if quantity >= position['quantity'] else 'reduce',
-            # 交易成本字段
-            'buy_commission': allocated_buy_commission,
-            'buy_transfer_fee': allocated_buy_transfer_fee,
-            'sell_commission': sell_commission,
-            'sell_transfer_fee': sell_transfer_fee,
-            'sell_stamp_tax': sell_stamp_tax
-        }
-    
+        """创建卖出记录（委托给 TradingCoreMixin.create_sell_record）。"""
+        return self.create_sell_record(
+            position=position,
+            sell_date=sell_date,
+            sell_price=sell_price,
+            quantity=quantity,
+            sell_type=sell_type,
+            hold_days=hold_days,
+            detail_url=self._generate_stock_detail_url(position['stock_code']),
+        )
+
     def _calculate_performance(self, trades: List[Dict], initial_capital: float, 
                               final_capital: float, dates: List[date], 
                               capital_history: List[float]) -> Dict:
