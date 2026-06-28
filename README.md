@@ -198,34 +198,35 @@ Windows 用户也可以直接双击根目录下 `start.bat` 文件自动处理
 │   ├── strategy_registry.py     # 策略注册表
 │   └── ...                      # 其他策略相关文件
 ├── trading/                     # 交易和评分模块
-│   ├── __init__.py              # 初始化文件
 │   ├── backtest_engine.py       # 回测引擎
+│   ├── trading_core_mixin.py    # 交易核心混入（成本计算、卖出记录、冷却池）
+│   ├── portfolio_manager.py     # 持仓管理 + 交易执行
+│   ├── strategy_executor.py     # 选股 + 评分 + 批量执行
+│   ├── strategy_runner.py       # 策略运行器（薄编排器）
 │   ├── backtest_dao.py          # 回测数据访问
-│   ├── backtest_batch_queue.py  # 批量回测队列
 │   ├── routes.py                # API路由
 │   ├── khunter_api.py           # 狩猎场API
-│   ├── khunter_dao.py           # 狩猎场数据访问
-│   ├── khunter_data_processor.py  # 狩猎场数据处理
-│   ├── khunter_support_calculator.py  # 狩猎场支撑位计算
-│   ├── khunter_buy_point_judge.py  # 狩猎场买点判断
-│   ├── stock_score_calculator.py  # 股票评分计算
-│   ├── stock_score_dao.py       # 股票评分数据访问
 │   ├── stock_score_api.py       # 股票评分API
-│   ├── strategy_execution_plan.py  # 策略执行计划
-│   ├── strategy_runner.py       # 策略运行器
-│   ├── macd_bollinger_strategy.py  # 顺势宝策略
+│   ├── timing_strategies.py     # 择时策略工厂
 │   ├── ptrade/                     # PTrade自动交易模块
 │   │   ├── khunter_auto_trade.py   # KHunter自动交易主程序
 │   │   ├── ptrade_feedback.py      # PTrade交易反馈
 │   │   └── ptradesample.py         # PTrade接入示例
 │   └── ...
+├── indicators/                  # 统一技术指标模块
+│   ├── ma.py                    # 移动平均线（ma/ema/sma）
+│   ├── oscillator.py            # 振荡指标（rsi/kdj/macd）
+│   ├── volatility.py            # 波动率（atr/bollinger）
+│   ├── range.py                 # 区间辅助（llv/hhv/ref/exist）
+│   ├── trend.py                 # 趋势指标（calculate_zhixing_trend）
+│   ├── returns.py               # 收益率指标（calculate_price_change/daily_return）
+│   └── _cache.py                # 指标缓存（CachedIndicators）
 ├── utils/                       # 工具模块
+│   ├── app_config.py            # 应用主配置单例（config.yaml 统一加载）
 │   ├── akshare_fetcher.py       # AKShare数据获取
 │   ├── db_manager.py            # 通用数据库管理器（SQLite连接池、事务）
 │   ├── stock_repo.py            # 股票数据仓库（K线/基本信息查询）
 │   ├── global_db.py             # 全局 DBManager/StockRepo 单例
-│   ├── csv_manager.py           # CSV数据管理
-│   ├── technical.py             # 技术指标
 │   ├── kline_chart.py           # K线图生成
 │   ├── log_config.py            # 日志配置与自动清理
 │   ├── risk_manager.py          # 风险管理

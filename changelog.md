@@ -1,5 +1,61 @@
 # Changelog
 
+## 2026-06-27（架构重构 Phase 3-5）
+
+### Phase 3：策略层统一 — 激活 indicators/ 模块
+
+**背景：** 7 个策略文件和 1 个 web 路由仍通过已废弃的 `utils/technical.py` shim 调用指标函数，需要完成最后一步迁移。
+
+**变更内容：**
+
+- 新建 `indicators/trend.py`：迁移 `calculate_zhixing_trend` 知行趋势指标
+- 新建 `indicators/returns.py`：迁移 `calculate_price_change`、`calculate_daily_return` 收益率指标
+- 迁移 7 个策略文件 + 1 个 web 路由的导入路径（`utils.technical` → `indicators`）
+- 适配 KDJ/MACD 返回值从 DataFrame 包装改为 tuple 解包
+- 更新 `BaseStrategy.calculate_indicators()` docstring 明确倒序合约
+- 删除 `utils/technical.py` deprecated 兼容层
+
+### Phase 4：配置层统一 — AppConfig 单例
+
+**背景：** `config/config.yaml` 被至少 4 个独立位置各自加载，形成 split-brain 问题。Web UI 修改配置后，其他加载方的内存缓存不会更新。
+
+**变更内容：**
+
+- 新建 `utils/app_config.py`：`AppConfig` 类 + `get_app_config()` 单例
+  - 支持 `get(key)` 点号分隔嵌套键、`set(key, value)` 原子写回、`update(data)` 批量更新
+  - 原子写入（临时文件 + `os.replace`）+ 线程锁
+- `web/routes/system.py`：GET/POST `/api/config` 改用 `AppConfig`
+- `main.py`：`QuantSystem` 改用 `AppConfig`，删除 `_load_config()`
+- `web/app_factory.py`：删除未使用的 `config_file` 死参数
+
+### Phase 5a：DataCollectionService 死代码清理
+
+**背景：** `utils/data_collection_service.py`（1301 行）是上帝模块，其中 14 个方法（~500 行）无任何外部调用者。
+
+**变更内容：**
+
+- 删除 14 个无调用者方法（初始化流程、配置查询、状态查询等）
+- 移除 `init_status`、`init_lock`、重复定义的 `_add_init_log`
+- 清理未使用导入（`DBManager`、`DatabaseInitializer`、`AKShareFetcher`）
+- 文件从 1301 行减少到 562 行（-57%）
+
+### Phase 5b：统一卖出基础设施
+
+**背景：** 回测引擎（`backtest_engine._process_sell`）和实盘组合管理器（`portfolio_manager._execute_sell`）的卖出逻辑已完全漂移。回测有完整的成本模型和风控，实盘无成本计算、无止损止盈。
+
+**变更内容：**
+
+- `TradingCoreMixin` 新增三个共享方法：
+  - `get_sell_price()` — 抽象方法，由子类实现价格来源（回测用开盘价，实盘用实时价格）
+  - `calculate_sell_cost()` — 统一卖出成本计算（佣金+过户费+印花税）
+  - `create_sell_record()` — 标准化 19 字段卖出记录
+- `backtest_engine._create_sell_record` 委托给 mixin
+- `portfolio_manager._execute_sell` 使用 mixin 的成本模型和标准化记录格式
+
+**注意：** 5 层卖出决策逻辑（止盈/止损/追踪止损/持仓过期/择时信号）仍留在 backtest_engine 中，因其深度耦合回测特有状态（价格缓存、择时策略等）。portfolio_manager 通过外部信号驱动卖出，使用 mixin 共享基础设施处理成本和记录。
+
+---
+
 ## 2026-06-27
 
 ### refactor: 消除 4 个上帝模块，系统架构全面重构
