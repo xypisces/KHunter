@@ -100,19 +100,19 @@ def update_data() -> Any:
         data_collection_service = get_data_collection_service()
 
         # 启动数据更新任务
-        import threading
+        result = data_collection_service.start_update()
 
-        def run_update() -> None:
-            try:
-                data_collection_service.start_update()
-            except Exception as e:
-                logger.error(f"数据更新失败: {str(e)}")
-
-        thread = threading.Thread(target=run_update)
-        thread.daemon = True
-        thread.start()
-
-        return jsonify({"success": True, "message": "数据更新已启动"})
+        if result.get("success"):
+            return jsonify({
+                "success": True,
+                "message": result.get("message", "数据更新已启动"),
+                "taskId": result.get("taskId")
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": result.get("message", "启动更新失败")
+            })
     except Exception as e:
         logger.error(f"启动数据更新失败: {str(e)}")
         return jsonify({"success": False, "error": str(e)})

@@ -41,32 +41,30 @@ function initDataUpdatePage() {
 async function loadLastUpdateTime() {
     try {
         console.log('加载上次更新时间...');
-        
-        const response = await fetch('/api/data/update/last-update-time');
+
+        // 使用 /api/stats 接口获取最新数据日期
+        const response = await fetch('/api/stats');
         const result = await response.json();
-        
+
         if (result.success) {
-            const lastUpdateTime = result.data.lastUpdateTime || '-';
-            const lastUpdateDate = result.data.lastUpdateDate || '-';
-            
+            const latestDate = result.data.latest_date || '-';
+
             // 格式化显示
             let displayText = '-';
-            if (lastUpdateTime && lastUpdateTime !== '-') {
-                displayText = lastUpdateTime;
-            } else if (lastUpdateDate && lastUpdateDate !== '-') {
-                displayText = lastUpdateDate;
+            if (latestDate && latestDate !== '-' && latestDate !== '未知') {
+                displayText = latestDate;
             }
-            
+
             // 更新UI
             const lastUpdateTimeElement = document.getElementById('last-update-time');
             if (lastUpdateTimeElement) {
                 lastUpdateTimeElement.textContent = displayText;
             }
-            
+
             console.log('上次更新时间:', displayText);
         } else {
             console.warn('获取上次更新时间失败:', result.message || result.error);
-            
+
             // 显示默认值
             const lastUpdateTimeElement = document.getElementById('last-update-time');
             if (lastUpdateTimeElement) {
@@ -75,7 +73,7 @@ async function loadLastUpdateTime() {
         }
     } catch (error) {
         console.error('加载上次更新时间时出错:', error);
-        
+
         // 显示默认值
         const lastUpdateTimeElement = document.getElementById('last-update-time');
         if (lastUpdateTimeElement) {
@@ -121,7 +119,7 @@ async function startDataUpdate() {
         console.log('发送请求到后端...');
         
         // 调用后端API启动更新
-        const response = await fetch('/api/data/update/start', {
+        const response = await fetch('/api/update', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -185,7 +183,7 @@ async function getUpdateProgress() {
     }
     
     try {
-        const url = `/api/data/update/progress?taskId=${updateTaskId}`;
+        const url = `/api/update/status`;
         const response = await fetch(url);
         const result = await response.json();
         
@@ -246,9 +244,19 @@ async function cancelDataUpdate() {
     }
     
     try {
-        const response = await fetch(`/api/data/update/cancel?taskId=${updateTaskId}`, {
-            method: 'POST'
-        });
+        // 注意：后端暂未实现取消功能，此功能需要后端支持
+        // const response = await fetch(`/api/update/cancel`, {
+        //     method: 'POST'
+        // });
+
+        // 临时方案：直接重置UI状态
+        if (updateProgressInterval) {
+            clearInterval(updateProgressInterval);
+            updateProgressInterval = null;
+        }
+        resetUpdateUI();
+        alert('✓ 数据更新已取消（注意：后端任务可能仍在运行）');
+        return;
         
         const result = await response.json();
         
@@ -292,12 +300,15 @@ function showUpdateCompleted(data) {
             // 提取统计数据
             const klineAdded = stats.kline_added || 0;
             const klineUpdated = stats.kline_updated || 0;
+            const klineFailed = stats.kline_failed || 0;
             const fundFlowAdded = stats.fund_flow_added || 0;
             const fundFlowUpdated = stats.fund_flow_updated || 0;
+            const fundFlowFailed = stats.fund_flow_failed || 0;
             
             // 计算总数
             const totalAdded = klineAdded + fundFlowAdded;
             const totalUpdated = klineUpdated + fundFlowUpdated;
+            const totalFailed = klineFailed + fundFlowFailed;
             const total = totalAdded + totalUpdated;
             
             // 更新统计数据
@@ -308,12 +319,29 @@ function showUpdateCompleted(data) {
             console.log('更新完成，统计信息:', {
                 klineAdded,
                 klineUpdated,
+                klineFailed,
                 fundFlowAdded,
                 fundFlowUpdated,
+                fundFlowFailed,
                 totalAdded,
                 totalUpdated,
+                totalFailed,
                 total
             });
+            
+            // 如果有失败数量，显示警告
+            if (totalFailed > 0) {
+                const statsDiv = document.getElementById('update-result-stats');
+                if (statsDiv) {
+                    let warningHtml = '';
+                    if (totalFailed > 1000) {
+                        warningHtml = `<div style="color: #dc2626; padding: 10px; background: #fef2f2; border-radius: 4px; margin-top: 10px;">⚠️ 警告: 失败股票数量(${totalFailed})超过1000，当日数据可能不完整，请重新更新!</div>`;
+                    } else {
+                        warningHtml = `<div style="color: #d97706; padding: 10px; background: #fffbeb; border-radius: 4px; margin-top: 10px;">⚠️ 提示: 部分数据更新失败 (K线: ${klineFailed}, 资金流向: ${fundFlowFailed})</div>`;
+                    }
+                    statsDiv.innerHTML += warningHtml;
+                }
+            }
             
             // 刷新首页统计信息
             loadStats();
@@ -342,5 +370,96 @@ function showUpdateCompleted(data) {
         }
     } catch (error) {
         console.error('显示完成状态时出错:', error);
+    }
+}
+
+/**
+ * 启动重建近期除权股票
+ */
+async function startRebuildExdividend() {
+    try {
+        console.log('用户点击了重建近期除权股票按钮');
+        
+        // 获取选择的时间范围
+        const monthsSelect = document.getElementById('exdividend-months');
+        const months = parseInt(monthsSelect.value) || 2;
+        
+        // 确认重建
+        if (!confirm(`确定要检测并重建最近${months}个月内发生除权的股票历史数据吗？`)) {
+            console.log('用户取消了重建除权股票');
+            return;
+        }
+        
+        // 获取按钮元素并禁用
+        const btn = document.getElementById('rebuild-exdividend-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '⏳ 处理中...';
+        }
+        
+        console.log(`发送请求到后端，重建最近${months}个月的除权股票...`);
+
+        // 注意：后端暂未实现此功能
+        // const response = await fetch('/api/update/rebuild-recent-exdividend', {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json'
+        //     },
+        //     body: JSON.stringify({ months: months })
+        // });
+
+        // 临时方案：显示提示信息
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🔄 检测并重建除权股票';
+        }
+
+        alert('此功能暂未实现，请联系开发者添加后端支持');
+    } catch (error) {
+        console.error('重建除权股票时出错:', error);
+        
+        // 确保按钮恢复正常
+        const btn = document.getElementById('rebuild-exdividend-btn');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🔄 检测并重建除权股票';
+        }
+        
+        alert('重建失败: ' + error.message);
+    }
+}
+
+/**
+ * 显示重建除权股票结果
+ */
+function showRebuildExdividendResult(result) {
+    try {
+        const data = result.data || {};
+        const detectedCount = data.detectedCount || 0;
+        const rebuiltCount = data.rebuiltCount || 0;
+        
+        // 更新结果区域
+        const resultDiv = document.getElementById('exdividend-result');
+        const resultText = document.getElementById('exdividend-result-text');
+        const detectedSpan = document.getElementById('exdividend-detected');
+        const rebuiltSpan = document.getElementById('exdividend-rebuilt');
+        
+        if (detectedSpan) detectedSpan.textContent = detectedCount;
+        if (rebuiltSpan) rebuiltSpan.textContent = rebuiltCount;
+        
+        if (detectedCount > 0) {
+            resultText.textContent = `成功检测到 ${detectedCount} 只除权股票，已重建 ${rebuiltCount} 只股票的历史数据。`;
+            resultText.style.color = '#10b981';
+        } else {
+            resultText.textContent = '未检测到除权股票，无需重建。';
+            resultText.style.color = '#6b7280';
+        }
+        
+        // 显示结果区域
+        if (resultDiv) resultDiv.style.display = 'block';
+        
+        console.log('重建除权股票完成:', { detectedCount, rebuiltCount });
+    } catch (error) {
+        console.error('显示重建结果时出错:', error);
     }
 }

@@ -116,30 +116,30 @@ API 响应示例：
 
 事件命名和 payload 格式：
 
-| 事件名 | 触发场景 | Payload |
-|--------|---------|---------|
-| `data_update_progress` | 数据更新 | `{current: 127, total: 3000, stock_code: "600519", stock_name: "贵州茅台", phase: "kline", success: 120, failed: 7}` |
-| `selection_progress` | 选股执行 | `{current: 50, total: 3000, stock_code: "600519", stock_name: "贵州茅台", phase: "evaluating"}` |
-| `backtest_progress` | 回测运行 | `{current_day: 125, total_days: 250, current_date: "2024-06-15", pnl: 0.05, trades_count: 12}` |
-| `task_completed` | 任意任务完成 | `{task: "data_update", success: true, message: "更新完成，成功 2993 只，失败 7 只"}` |
-| `task_error` | 任意任务失败 | `{task: "backtest", error: "数据库连接超时"}` |
+| 事件名                 | 触发场景     | Payload                                                                                                              |
+| ---------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `data_update_progress` | 数据更新     | `{current: 127, total: 3000, stock_code: "600519", stock_name: "贵州茅台", phase: "kline", success: 120, failed: 7}` |
+| `selection_progress`   | 选股执行     | `{current: 50, total: 3000, stock_code: "600519", stock_name: "贵州茅台", phase: "evaluating"}`                      |
+| `backtest_progress`    | 回测运行     | `{current_day: 125, total_days: 250, current_date: "2024-06-15", pnl: 0.05, trades_count: 12}`                       |
+| `task_completed`       | 任意任务完成 | `{task: "data_update", success: true, message: "更新完成，成功 2993 只，失败 7 只"}`                                 |
+| `task_error`           | 任意任务失败 | `{task: "backtest", error: "数据库连接超时"}`                                                                        |
 
 ### D6: URL 路由映射
 
 React 路径 → 后端 API 端点：
 
-| React 路径 | 页面 | 主要 API 端点 |
-|-----------|------|-------------|
-| `/` | 仪表盘 | `/api/stats`, `/api/dashboard/*`, `/api/risk/status` |
-| `/stocks` | 股票列表 | `/api/stocks`, `/api/stock/<code>` |
-| `/selection` | 选股 | `/api/select`, `/api/strategies/names` |
-| `/selection/history` | 选股历史 | `/api/selection-history` |
-| `/analysis` | 个股分析 | `/api/analyze-stock`, `/api/analysis-history` |
-| `/strategies` | 策略管理 | `/api/strategies`, `/api/strategies/<name>/params` |
-| `/backtest` | 回测 | `/api/trading/backtest/*` |
-| `/khunter` | 狩猎场 | `/api/khunter/*` |
-| `/risk` | 风险监控 | `/api/risk/*` |
-| `/system` | 系统管理 | `/api/config`, `/api/update`, `/api/data/*` |
+| React 路径           | 页面     | 主要 API 端点                                        |
+| -------------------- | -------- | ---------------------------------------------------- |
+| `/`                  | 仪表盘   | `/api/stats`, `/api/dashboard/*`, `/api/risk/status` |
+| `/stocks`            | 股票列表 | `/api/stocks`, `/api/stock/<code>`                   |
+| `/selection`         | 选股     | `/api/select`, `/api/strategies/names`               |
+| `/selection/history` | 选股历史 | `/api/selection-history`                             |
+| `/analysis`          | 个股分析 | `/api/analyze-stock`, `/api/analysis-history`        |
+| `/strategies`        | 策略管理 | `/api/strategies`, `/api/strategies/<name>/params`   |
+| `/backtest`          | 回测     | `/api/trading/backtest/*`                            |
+| `/khunter`           | 狩猎场   | `/api/khunter/*`                                     |
+| `/risk`              | 风险监控 | `/api/risk/*`                                        |
+| `/system`            | 系统管理 | `/api/config`, `/api/update`, `/api/data/*`          |
 
 ### D7: TypeScript 类型策略
 

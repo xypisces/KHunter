@@ -41,32 +41,30 @@ function initDataUpdatePage() {
 async function loadLastUpdateTime() {
     try {
         console.log('加载上次更新时间...');
-        
-        const response = await fetch('/api/data/update/last-update-time');
+
+        // 使用 /api/stats 接口获取最新数据日期
+        const response = await fetch('/api/stats');
         const result = await response.json();
-        
+
         if (result.success) {
-            const lastUpdateTime = result.data.lastUpdateTime || '-';
-            const lastUpdateDate = result.data.lastUpdateDate || '-';
-            
+            const latestDate = result.data.latest_date || '-';
+
             // 格式化显示
             let displayText = '-';
-            if (lastUpdateTime && lastUpdateTime !== '-') {
-                displayText = lastUpdateTime;
-            } else if (lastUpdateDate && lastUpdateDate !== '-') {
-                displayText = lastUpdateDate;
+            if (latestDate && latestDate !== '-' && latestDate !== '未知') {
+                displayText = latestDate;
             }
-            
+
             // 更新UI
             const lastUpdateTimeElement = document.getElementById('last-update-time');
             if (lastUpdateTimeElement) {
                 lastUpdateTimeElement.textContent = displayText;
             }
-            
+
             console.log('上次更新时间:', displayText);
         } else {
             console.warn('获取上次更新时间失败:', result.message || result.error);
-            
+
             // 显示默认值
             const lastUpdateTimeElement = document.getElementById('last-update-time');
             if (lastUpdateTimeElement) {
@@ -75,7 +73,7 @@ async function loadLastUpdateTime() {
         }
     } catch (error) {
         console.error('加载上次更新时间时出错:', error);
-        
+
         // 显示默认值
         const lastUpdateTimeElement = document.getElementById('last-update-time');
         if (lastUpdateTimeElement) {
@@ -121,7 +119,7 @@ async function startDataUpdate() {
         console.log('发送请求到后端...');
         
         // 调用后端API启动更新
-        const response = await fetch('/api/data/update/start', {
+        const response = await fetch('/api/update', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -185,7 +183,7 @@ async function getUpdateProgress() {
     }
     
     try {
-        const url = `/api/data/update/progress?taskId=${updateTaskId}`;
+        const url = `/api/update/status`;
         const response = await fetch(url);
         const result = await response.json();
         
@@ -246,9 +244,19 @@ async function cancelDataUpdate() {
     }
     
     try {
-        const response = await fetch(`/api/data/update/cancel?taskId=${updateTaskId}`, {
-            method: 'POST'
-        });
+        // 注意：后端暂未实现取消功能，此功能需要后端支持
+        // const response = await fetch(`/api/update/cancel`, {
+        //     method: 'POST'
+        // });
+
+        // 临时方案：直接重置UI状态
+        if (updateProgressInterval) {
+            clearInterval(updateProgressInterval);
+            updateProgressInterval = null;
+        }
+        resetUpdateUI();
+        alert('✓ 数据更新已取消（注意：后端任务可能仍在运行）');
+        return;
         
         const result = await response.json();
         
@@ -390,33 +398,23 @@ async function startRebuildExdividend() {
         }
         
         console.log(`发送请求到后端，重建最近${months}个月的除权股票...`);
-        
-        // 调用后端API
-        const response = await fetch('/api/data/update/rebuild-recent-exdividend', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ months: months })
-        });
-        
-        const result = await response.json();
-        console.log('后端响应:', result);
-        
-        // 启用按钮
+
+        // 注意：后端暂未实现此功能
+        // const response = await fetch('/api/update/rebuild-recent-exdividend', {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json'
+        //     },
+        //     body: JSON.stringify({ months: months })
+        // });
+
+        // 临时方案：显示提示信息
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = '🔄 检测并重建除权股票';
         }
-        
-        if (result.success) {
-            // 显示结果
-            showRebuildExdividendResult(result);
-        } else {
-            const errorMsg = result.message || result.error || '未知错误';
-            console.error('重建除权股票失败:', errorMsg);
-            alert('重建失败: ' + errorMsg);
-        }
+
+        alert('此功能暂未实现，请联系开发者添加后端支持');
     } catch (error) {
         console.error('重建除权股票时出错:', error);
         
